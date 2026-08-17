@@ -88,6 +88,17 @@ const okFetch = async () => ({
   text: async () => '{"ok":true}',
 })
 
+test('first launch uses Mikey tailnet connection without setup', async () => {
+  const d = loadBridge()
+  const conn = await d.getConnection()
+  assert.equal(conn.baseUrl, 'https://mikeys-mac-mini.tailaf453c.ts.net:9443')
+  assert.equal(conn.token, 'mikey-tailnet')
+  assert.match(
+    await d.getGatewayWsUrl(),
+    /^wss:\/\/mikeys-mac-mini\.tailaf453c\.ts\.net:9443\/api\/ws\?token=/,
+  )
+})
+
 test('the bridge loads headlessly and exposes the expected surface', () => {
   const d = loadBridge({ config: CONFIG })
   assert.equal(typeof d.api, 'function')

@@ -1,7 +1,7 @@
 {
-  "name": "hermes-mobile-client",
+  "name": "mikey-ios",
   "version": "1.0.0",
-  "description": "Native iOS client that bundles the Hermes desktop renderer and connects to a self-hosted Hermes gateway (remote-only).",
+  "description": "Mikey: Nacho's private iOS client for his self-hosted Hermes agent.",
   "scripts": {
     "build": "./desktop-port/build.sh",
     "test": "node --test desktop-port/test/fix-assets.test.mjs desktop-port/test/bridge.test.mjs",
@@ -12,14 +12,13 @@
     "capacitor",
     "ios"
   ],
-  "author": "Hermes Mobile Client contributors",
+  "author": "Nacho Iacovino",
   "license": "MIT",
   "dependencies": {
     "@capacitor/core": "^8.4.2",
     "@capacitor/ios": "^8.4.2"
   },
   "devDependencies": {
-    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.4.2",
     "typescript": "^5.9.3"
   }

@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.nousresearch.hermes.mobile',
-  appName: 'Hermes',
+  appId: 'com.ignacioiacovino.mikey',
+  appName: 'Mikey',
   webDir: 'desktop-port/dist',
   backgroundColor: '#F8FAFF',
   ios: {

@@ -8,17 +8,17 @@
  * with "Desktop IPC bridge is unavailable." This shim reconstructs the exact
  * bridge contract the renderer's boot, gateway-settings panel, and zoom/profile
  * stores rely on, backed by a REMOTE gateway whose URL + session token are read
- * from localStorage (there is no same-origin host and no token scraping).
+ * localStorage (there is no same-origin host and no token scraping). The Mikey
+ * build ships with a tailnet-only default connection so first launch is ready.
  *
  * Every shape here is extracted from the hermes-agent v2026.7.7.2 checkout in
  * desktop-port/vendor/; see desktop-port/shim/CONTRACT.md for file:line
  * evidence. Where this disagrees with the task brief's skeleton, CONTRACT.md
  * governs.
  *
- * Security: the session token is stored ONLY in localStorage under
- * `hermes.remoteGateway` (JSON `{ url, token }`). It is NEVER logged, NEVER
- * embedded in an error message, and never sent anywhere except as the gateway's
- * own `X-Hermes-Session-Token` REST header / `?token=` WS query param.
+ * Security: the bundled token below is a non-secret proxy marker. The real
+ * Hermes session credential remains on the Mac mini and is injected by its
+ * loopback-only reverse proxy after Tailscale has admitted the connection.
  */
 (() => {
   'use strict'
@@ -26,12 +26,10 @@
   // localStorage key + JSON shape the connection config is persisted under.
   const STORAGE_KEY = 'hermes.remoteGateway'
 
-  // UI prefill ONLY (optional). If non-empty, it is shown as the default value
-  // in the "connect" screen's URL field before anything is saved. Leave empty
-  // for a generic build; a self-hoster may set their own gateway URL here for
-  // convenience. It is NEVER an implicit fallback for a real connection:
-  // getConnection()/api() read the STORED config exclusively.
-  const DEFAULT_GATEWAY_URL = ''
+  // Nacho's private, tailnet-only backend. The marker is deliberately not the
+  // backend credential; the Mac-side proxy replaces it after Tailscale access.
+  const DEFAULT_GATEWAY_URL = 'https://mikeys-mac-mini.tailaf453c.ts.net:9443'
+  const DEFAULT_GATEWAY_TOKEN = 'mikey-tailnet'
 
   // Shown when boot / a REST call runs with no usable stored config. Actionable,
   // and free of any token material.
@@ -49,7 +47,7 @@
       return null
     }
     if (!raw) {
-      return null
+      return { url: DEFAULT_GATEWAY_URL, token: DEFAULT_GATEWAY_TOKEN }
     }
     try {
       const parsed = JSON.parse(raw)
