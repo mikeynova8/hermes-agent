@@ -1,4 +1,5 @@
 node_modules/
+dist/
 ios/App/Pods/
 ios/App/App/public/
 ios/App/output/

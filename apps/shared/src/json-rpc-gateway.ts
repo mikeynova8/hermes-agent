@@ -159,6 +159,15 @@ export class JsonRpcGatewayClient {
       socket.addEventListener('open', onOpen, { once: true })
       socket.addEventListener('error', onError, { once: true })
 
+      // A very fast socket (notably WKWebView talking to a nearby tailnet
+      // endpoint) can become OPEN between construction and listener
+      // registration. Browser open events are not replayed, so resolve from
+      // readyState as well instead of leaving connect() stuck until timeout.
+      if (socket.readyState === WebSocket.OPEN) {
+        onOpen()
+        return
+      }
+
       if (this.options.connectTimeoutMs > 0) {
         timer = setTimeout(() => {
           if (settled) {

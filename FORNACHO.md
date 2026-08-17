@@ -26,17 +26,15 @@ That design is why work can continue across mobile, desktop, and CLI without cre
 
 ## Architecture
 
-### 1. Capacitor shell
+### 1. Capacitor shell and dedicated renderer
 
-The iOS app is a native Capacitor 8 container around the Hermes desktop renderer. Capacitor supplies the real iOS application, lifecycle, signing, and `WKWebView`; Hermes supplies the chat interface.
+The iOS app is a native Capacitor 8 container around a dedicated React/Vite mobile renderer. Capacitor supplies the iOS lifecycle, signing, and `WKWebView`; the renderer supplies a phone-first conversation UI rather than squeezing Hermes Desktop onto a narrow screen.
 
-This was the fastest path to a useful personal client because it reuses the mature renderer instead of rebuilding every chat surface in SwiftUI.
+The mobile client reuses Hermes contracts—not its desktop layout. Session history comes through REST, while streaming messages, tools, prompts, and Projects use the structured JSON-RPC gateway.
 
-### 2. Browser compatibility shim
+### 2. Mobile transport boundary
 
-Hermes Desktop normally talks to Electron APIs. Those APIs do not exist in an iOS `WKWebView`, so `desktop-port/shim/hermes-web-shim.js` recreates the small bridge contract the renderer expects.
-
-The shim knows Nacho's private Tailscale gateway URL. Its bundled token is only a non-secret marker. It is not the real Hermes session credential.
+`apps/mobile/src/transport/` contains the tailnet endpoint, authenticated request helpers, and session-history API. `apps/shared/src/json-rpc-gateway.ts` supplies the reusable WebSocket client. The bundled marker remains non-secret; the real Hermes session credential never enters the IPA.
 
 ### 3. Mac-side credential boundary
 
@@ -58,11 +56,13 @@ The endpoint is private to the tailnet. HTTPS protects transport; Tailscale cont
 
 The mobile implementation lives under `apps/mobile/`:
 
-- `capacitor.config.ts` — app identity and web bundle location.
-- `package.json` — mobile build and test commands.
-- `desktop-port/build.sh` — builds Hermes Desktop for the browser target.
-- `desktop-port/shim/hermes-web-shim.js` — Electron-to-browser compatibility bridge and private gateway default.
-- `desktop-port/test/bridge.test.mjs` — bridge contract and first-launch connection tests.
+- `capacitor.config.ts` — app identity and dedicated Vite bundle location.
+- `src/App.tsx` — phone-first chat, drawer, Projects, composer, and lifecycle orchestration.
+- `src/chat/` — transcript normalization, timestamps, gateway reducer, and new-session routing.
+- `src/projects/` — native Hermes Project list, creation, session flattening, and cwd inheritance.
+- `src/transport/` — tailnet REST/WebSocket transport and history loading.
+- `vite.config.ts` / `package.json` — production build and Vitest gates.
+- `desktop-port/` — retained temporarily as historical fallback; it is not packaged in Build 3.
 - `ios/App/` — native Xcode workspace, signing settings, Info.plist, icons, and generated web assets.
 - `assets/logo.png` — source Mikey icon.
 
@@ -70,9 +70,9 @@ Mac-side service configuration is deliberately outside the repository under `~/.
 
 ## Technical choices
 
-### Why Capacitor instead of SwiftUI
+### Why Capacitor plus a dedicated React renderer
 
-A SwiftUI rewrite could eventually feel more native, but it would require rebuilding streaming chat, Markdown, code blocks, tool cards, artifacts, sessions, settings, and many edge cases. Capacitor gave us the existing Hermes experience immediately while preserving access to native iOS APIs later.
+Builds 1–2 proved that wrapping the full desktop renderer was technically fast but visually wrong. A full SwiftUI rewrite would still duplicate streaming, Markdown, gateway events, sessions, and attachment behavior. The middle path keeps the proven Capacitor shell and Hermes protocols while replacing the desktop composition with a small mobile-only renderer.
 
 ### Why a remote Mac backend
 
@@ -91,7 +91,7 @@ App Store Connect names are globally unique, and “Mikey” was already taken. 
 - Display name: **Mikey**
 - App Store Connect record: **Mikey Agent**
 - Bundle ID: `com.ignacioiacovino.mikey`
-- Version/build: `1.0 (1)`
+- Version/build: `1.0 (3)`
 - Apple team: `JXF76W23J6`
 - App Store Connect app ID: `6802144898`
 
@@ -169,6 +169,19 @@ The session drawer keeps its own vertical scroll container. Choosing a session, 
 The composer needed its own mobile adaptation. Desktop Git branch and repository `+/-` counters were removed on iPhone, the giant wordmark became a compact empty state, and thread changes no longer auto-focus the editor. That last detail matters because WKWebView can otherwise summon its input accessory and pan the whole shell beneath the notch.
 
 Visual QA on iPhone 17 / iOS 26.2 confirmed the drawer opens, scrolls through more than 30 sessions to its bottom navigation, and closes after a session is selected. The chat remains a single dark column and the accidental file-browser path is absent.
+
+## Build 3: a real mobile client
+
+Build 3 removes the desktop renderer from the packaged application. The result is a calm, chat-first UI with conversation titles, subtle WhatsApp/Telegram-style timestamps and day separators, one-row composer controls, collapsed tool activity, and no file explorer, Git chrome, terminal, or desktop pane graph.
+
+The conversation drawer now uses native Hermes Projects. A Project groups chats under a workspace, persists in Hermes' `projects.db`, and provides the default working directory for new chats. Because Projects are profile-scoped, the current client creates them under the connected `default` Hermes profile. Cross-profile selection requires a real profile-specific gateway connection; a decorative dropdown would be misleading.
+
+Two integration bugs were especially instructive:
+
+1. A WebSocket can open before an event listener is fully attached in WKWebView. The shared gateway client now reconciles that connection ordering instead of leaving the app stuck at “Connecting.”
+2. REST transcript messages use `content`, while `session.resume` messages can use `text`. The mobile normalizer accepts both and preserves the better historical timestamps rather than replacing a valid transcript with empty messages.
+
+Build 3 verification includes 14 Vitest regressions, TypeScript, production Vite build, zero production npm vulnerabilities, credential scanning, simulator compile/install/launch, real session restore, live Hermes Project loading/drill-in, keyboard-safe Project creation UI, and exact screenshot approval. The final release candidate uses a consistent Lucide icon set and 44-point controls; the composer placeholder uses a symmetric 44-point line box so it is optically centered.
 
 ## Pitfalls for the next build
 
