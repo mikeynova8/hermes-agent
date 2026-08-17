@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  ArrowDown as ScrollDownIcon,
   ArrowUp as SendIcon,
   ChevronDown as ChevronIcon,
   ChevronLeft as BackIcon,
@@ -18,6 +19,7 @@ import {
 import { dateLabel, formatTime, sameCalendarDay, transcriptMessages } from './chat/format'
 import { reduceGatewayEvent } from './chat/event-reducer'
 import { newSessionParams } from './chat/session-create'
+import { isNearBottom } from './chat/scroll'
 import { EMPTY_THREAD, type ThreadState } from './chat/types'
 import {
   createProject,
@@ -75,6 +77,7 @@ export function App() {
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [showScrollDown, setShowScrollDown] = useState(false)
 
   const gatewayRef = useRef<JsonRpcGatewayClient | null>(null)
   const selectedRef = useRef<string | null>(null)
@@ -82,6 +85,8 @@ export function App() {
   const reconnectAttemptRef = useRef(0)
   const resumeInFlightRef = useRef<string | null>(null)
   const timelineRef = useRef<HTMLDivElement | null>(null)
+  const followBottomRef = useRef(true)
+  const forceBottomRef = useRef(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   selectedRef.current = selectedId
@@ -141,10 +146,14 @@ export function App() {
   }
 
   const resumeSession = useCallback(async (storedId: string, fallback = true) => {
+    forceBottomRef.current = true
+    followBottomRef.current = true
+    setShowScrollDown(false)
     setSelectedId(storedId)
     window.localStorage.setItem('mikey.lastSessionId', storedId)
     setDrawerOpen(false)
     setError(null)
+    setThread({ ...EMPTY_THREAD, storedId })
 
     if (fallback) {
       try {
@@ -258,14 +267,55 @@ export function App() {
     )
   }, [connection, refreshProjects])
 
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const node = timelineRef.current
+    if (!node) return
+    followBottomRef.current = true
+    forceBottomRef.current = false
+    node.scrollTo({ top: node.scrollHeight, behavior })
+    setShowScrollDown(false)
+  }, [])
+
+  const updateScrollState = useCallback(() => {
+    const node = timelineRef.current
+    if (!node) return
+    const nearBottom = isNearBottom(node.scrollHeight, node.scrollTop, node.clientHeight)
+    followBottomRef.current = nearBottom
+    setShowScrollDown(thread.messages.length > 0 && !nearBottom)
+  }, [thread.messages.length])
+
+  // Force every selected conversation to its newest message. Two frames let
+  // React commit and WKWebView finish laying out even a very long transcript.
+  useEffect(() => {
+    if (!forceBottomRef.current || thread.messages.length === 0) return
+    let secondFrame = 0
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => scrollToBottom('auto'))
+    })
+    return () => {
+      cancelAnimationFrame(firstFrame)
+      if (secondFrame) cancelAnimationFrame(secondFrame)
+    }
+  }, [scrollToBottom, selectedId, thread.messages.length])
+
+  // Follow live output only while the user remains near the bottom. Observing
+  // content size also handles wrapping and expanding tool cards after render.
   useEffect(() => {
     const node = timelineRef.current
     if (!node) return
-    const distance = node.scrollHeight - node.scrollTop - node.clientHeight
-    if (distance < 180) requestAnimationFrame(() => node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' }))
-  }, [thread.messages, thread.activities])
+    const content = node.firstElementChild
+    const observer = new ResizeObserver(() => {
+      if (forceBottomRef.current || followBottomRef.current) scrollToBottom('auto')
+      else updateScrollState()
+    })
+    if (content) observer.observe(content)
+    return () => observer.disconnect()
+  }, [scrollToBottom, updateScrollState])
 
   const startNew = () => {
+    forceBottomRef.current = false
+    followBottomRef.current = true
+    setShowScrollDown(false)
     setSelectedId(null)
     selectedRef.current = null
     window.localStorage.removeItem('mikey.lastSessionId')
@@ -367,7 +417,7 @@ export function App() {
       )}
       {error && <button className="error-banner" onClick={() => setError(null)}>{error}</button>}
 
-      <main className="timeline" ref={timelineRef} aria-live="polite">
+      <main className="timeline" ref={timelineRef} aria-live="polite" onScroll={updateScrollState}>
         {thread.messages.length === 0 && !thread.busy ? (
           <section className="empty-state">
             <h2>What can I help with?</h2>
@@ -407,6 +457,16 @@ export function App() {
           </div>
         )}
       </main>
+
+      {showScrollDown && (
+        <button
+          className="scroll-down-button"
+          aria-label="Scroll to latest message"
+          onClick={() => scrollToBottom('smooth')}
+        >
+          <ScrollDownIcon />
+        </button>
+      )}
 
       <footer className="composer-wrap">
         {attachments.length > 0 && (

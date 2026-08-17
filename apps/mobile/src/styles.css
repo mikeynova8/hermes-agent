@@ -320,6 +320,32 @@ svg {
   color: var(--tertiary);
 }
 
+.scroll-down-button {
+  position: absolute;
+  z-index: 24;
+  right: 22px;
+  bottom: calc(72px + max(10px, env(safe-area-inset-bottom)));
+  display: grid;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--strong-border);
+  border-radius: 50%;
+  background: var(--overlay);
+  color: var(--text);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 42%);
+}
+
+.scroll-down-button:active {
+  transform: scale(0.94);
+}
+
+.scroll-down-button svg {
+  width: 20px;
+  height: 20px;
+}
+
 .composer-wrap {
   z-index: 22;
   flex: 0 0 auto;

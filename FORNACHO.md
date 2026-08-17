@@ -91,7 +91,7 @@ App Store Connect names are globally unique, and “Mikey” was already taken. 
 - Display name: **Mikey**
 - App Store Connect record: **Mikey Agent**
 - Bundle ID: `com.ignacioiacovino.mikey`
-- Version/build: `1.0 (3)`
+- Version/build: `1.0 (4)`
 - Apple team: `JXF76W23J6`
 - App Store Connect app ID: `6802144898`
 
@@ -182,6 +182,18 @@ Two integration bugs were especially instructive:
 2. REST transcript messages use `content`, while `session.resume` messages can use `text`. The mobile normalizer accepts both and preserves the better historical timestamps rather than replacing a valid transcript with empty messages.
 
 Build 3 verification includes 14 Vitest regressions, TypeScript, production Vite build, zero production npm vulnerabilities, credential scanning, simulator compile/install/launch, real session restore, live Hermes Project loading/drill-in, keyboard-safe Project creation UI, and exact screenshot approval. The final release candidate uses a consistent Lucide icon set and 44-point controls; the composer placeholder uses a symmetric 44-point line box so it is optically centered.
+
+## Build 4: deterministic long-conversation scrolling
+
+Build 3 used a circular scroll heuristic: it would scroll after rendering only when the viewport was already within 180 points of the bottom. A newly selected long transcript begins far from the bottom, so the condition prevented its own recovery. Build 4 models the intent explicitly instead:
+
+- selecting a conversation forces an immediate jump to its newest message after React and WKWebView complete layout;
+- live output remains pinned only while the reader is already near the bottom;
+- scrolling upward reveals a 44-point floating down-arrow above the composer;
+- tapping the arrow smoothly restores the newest message and resumes bottom-following;
+- a `ResizeObserver` catches late wrapping and expanding activity cards that change transcript height without adding a message.
+
+The complaint-driven browser fixture exercised a real 69,728-pixel transcript. It opened at exactly zero pixels from the bottom, exposed the control after moving 700 pixels upward, and returned to zero after the button was tapped. Four pure scroll-boundary regressions bring the dedicated mobile suite to 18 tests.
 
 ## Pitfalls for the next build
 
