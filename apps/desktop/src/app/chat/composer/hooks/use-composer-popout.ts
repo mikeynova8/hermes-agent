@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { type RefObject, useCallback, useEffect } from 'react'
 
+import { useIsMobile } from '@/hooks/use-mobile'
 import { triggerHaptic } from '@/lib/haptics'
 import {
   $composerPopoutPosition,
@@ -30,7 +31,8 @@ export function useComposerPopout({ composerRef }: UseComposerPopoutOptions) {
   // The floating composer is a window-level singleton: only the main scope
   // (not tiles) in a primary window may pop out.
   const scope = useComposerScope()
-  const popoutAllowed = !isSecondaryWindow() && scope.popoutAllowed
+  const isMobile = useIsMobile()
+  const popoutAllowed = !isMobile && !isSecondaryWindow() && scope.popoutAllowed
   const poppedOut = useStore($composerPoppedOut) && popoutAllowed
   const popoutPosition = useStore($composerPopoutPosition)
 

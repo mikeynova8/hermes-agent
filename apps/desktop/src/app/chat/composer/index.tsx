@@ -5,6 +5,7 @@ import { type ClipboardEvent, type FormEvent, type KeyboardEvent, useCallback, u
 import { composerFill, composerSurfaceGlass } from '@/components/chat/composer-dock'
 import { Button } from '@/components/ui/button'
 import { Slot as ContribSlot } from '@/contrib/react/slot'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { useI18n } from '@/i18n'
 import { chatMessageText } from '@/lib/chat-messages'
 import { sanitizeComposerInput } from '@/lib/composer-input-sanitize'
@@ -84,6 +85,8 @@ export function ChatBar({
   onSubmit: onSubmitProp,
   onTranscribeAudio
 }: ChatBarProps) {
+  const isMobile = useIsMobile()
+
   // Every send (typed, queued, voice) passes through the contributed
   // middleware chain first — rewrite / pass-through / cancel. Empty chain =
   // exact pass-through, so surfaces without contributions are byte-identical.
@@ -152,6 +155,35 @@ export function ChatBar({
   const reconnecting = gatewayState === 'closed' || gatewayState === 'error'
   const inputDisabled = disabled && !reconnecting
 
+  // WKWebView may restore focus to the editor while a resumed thread replaces
+  // the drawer, even though mobile auto-focus is disabled below. That summons
+  // the iOS input accessory and pans the fixed shell under the notch. Defer the
+  // blur until all route/composer effects have settled; an intentional tap on
+  // the composer happens later and still focuses normally.
+  useEffect(() => {
+    if (!isMobile) {
+      return undefined
+    }
+
+    const resetViewport = () => {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur()
+      }
+
+      window.scrollTo(0, 0)
+      document.documentElement.scrollTop = 0
+      document.body.scrollTop = 0
+    }
+
+    // WebKit can apply its focus pan one or two frames after React commits the
+    // resumed thread, so reset once immediately and twice after that deferred
+    // native adjustment. This only runs when focusKey changes, never while the
+    // user is typing.
+    const timers = [0, 100, 300].map(delay => window.setTimeout(resetViewport, delay))
+
+    return () => timers.forEach(timer => window.clearTimeout(timer))
+  }, [focusKey, isMobile])
+
   // The draft engine — detached source of truth (DOM + draftRef + edge
   // selectors); typing never re-renders the chrome. ChatBar owns `queueEditRef`
   // and threads it in so the draft↔queue coupling is an explicit dep, not a tangle.
@@ -171,7 +203,14 @@ export function ChatBar({
     sessionIdRef,
     setComposerText,
     stashAt
-  } = useComposerDraft({ activeQueueSessionKey, focusKey, inputDisabled, queueEditRef, sessionId })
+  } = useComposerDraft({
+    activeQueueSessionKey,
+    autoFocus: !isMobile,
+    focusKey,
+    inputDisabled,
+    queueEditRef,
+    sessionId
+  })
 
   // "Add URL" dialog — open/value state, autofocus, and submit (host onAddUrl or
   // an @url: directive into the draft).
@@ -938,14 +977,16 @@ export function ChatBar({
                   composerSurfaceGlass
                 )}
               />
-              <CodingStatusRow
-                onBranchOff={handleBranchOff}
-                onConvertBranch={handleConvertBranch}
-                onListBranches={handleListBranches}
-                onOpen={toggleReview}
-                onOpenWorktree={openInWorktree}
-                onSwitchBranch={handleSwitchBranch}
-              />
+              {!isMobile && (
+                <CodingStatusRow
+                  onBranchOff={handleBranchOff}
+                  onConvertBranch={handleConvertBranch}
+                  onListBranches={handleListBranches}
+                  onOpen={toggleReview}
+                  onOpenWorktree={openInWorktree}
+                  onSwitchBranch={handleSwitchBranch}
+                />
+              )}
               <div
                 className={cn(
                   'relative z-1 flex min-h-0 w-full flex-col gap-(--composer-row-gap) overflow-hidden rounded-[inherit] px-(--composer-surface-pad-x) py-(--composer-surface-pad-y) transition-opacity duration-200 ease-out',

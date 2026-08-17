@@ -26,6 +26,7 @@ import type { ChatBarProps } from '../types'
 
 interface UseComposerDraftArgs {
   activeQueueSessionKey: string | null
+  autoFocus?: boolean
   focusKey: ChatBarProps['focusKey']
   inputDisabled: boolean
   queueEditRef: RefObject<QueueEditState | null>
@@ -44,6 +45,7 @@ interface UseComposerDraftArgs {
  */
 export function useComposerDraft({
   activeQueueSessionKey,
+  autoFocus = true,
   focusKey,
   inputDisabled,
   queueEditRef,
@@ -147,11 +149,20 @@ export function useComposerDraft({
     [paintDraft]
   )
 
+  // Desktop keeps its fast keyboard-first behavior. Mobile intentionally waits
+  // for a tap so iOS does not cover the first screen with its keyboard/accessory
+  // bar. Explicit insert/focus requests still focus through focusRequestId.
   useEffect(() => {
-    if (!inputDisabled) {
+    if (autoFocus && !inputDisabled) {
       focusInput()
     }
-  }, [focusInput, focusKey, focusRequestId, inputDisabled])
+  }, [autoFocus, focusInput, focusKey, inputDisabled])
+
+  useEffect(() => {
+    if (focusRequestId > 0 && !inputDisabled) {
+      focusInput()
+    }
+  }, [focusInput, focusRequestId, inputDisabled])
 
   useEffect(() => {
     if (inputDisabled) {

@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
 const SIDEBAR_COOKIE_NAME = 'sidebar_state'
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = '16rem'
-const SIDEBAR_WIDTH_MOBILE = '18rem'
+const SIDEBAR_WIDTH_MOBILE = 'min(88vw, 22rem)'
 const SIDEBAR_WIDTH_ICON = '3rem'
 
 type SidebarContextProps = {
@@ -174,7 +174,9 @@ function Sidebar({
             <SheetTitle>{t.ui.sidebar.title}</SheetTitle>
             <SheetDescription>{t.ui.sidebar.description}</SheetDescription>
           </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
+          <div className="flex h-full min-h-0 w-full flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
+            {children}
+          </div>
         </SheetContent>
       </Sheet>
     )

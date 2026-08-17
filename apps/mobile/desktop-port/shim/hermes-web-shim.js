@@ -23,6 +23,25 @@
 (() => {
   'use strict'
 
+  // Mikey is a personal, dark-first mobile client. Seed the renderer's own
+  // appearance keys before its module graph loads so the first frame, sheets,
+  // Markdown, code blocks and tool cards all use one coherent dark palette.
+  // The renderer still owns the palette; this only selects its supported mode.
+  document.documentElement.dataset.mikeyMobile = 'true'
+  document.documentElement.classList?.add('mikey-mobile-client')
+  if (document.documentElement.style) {
+    document.documentElement.style.colorScheme = 'dark'
+  }
+  try {
+    window.localStorage.setItem('hermes-desktop-mode-v1', 'dark')
+    window.localStorage.setItem('hermes-desktop-active-profile-v1', 'default')
+    window.localStorage.setItem('hermes-boot-background', '#0d0d0e')
+    window.localStorage.setItem('hermes-boot-color-scheme', 'dark')
+  } catch {
+    // Storage can be unavailable in restricted WKWebView modes. The renderer's
+    // normal system-appearance fallback remains usable in that case.
+  }
+
   // localStorage key + JSON shape the connection config is persisted under.
   const STORAGE_KEY = 'hermes.remoteGateway'
 

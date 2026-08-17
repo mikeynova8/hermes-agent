@@ -19,7 +19,8 @@ import {
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuButton,
-  SidebarMenuItem
+  SidebarMenuItem,
+  useSidebar
 } from '@/components/ui/sidebar'
 import { useContributions } from '@/contrib/react/use-contributions'
 import { searchSessions, type SessionInfo, type SessionSearchResult } from '@/hermes'
@@ -241,6 +242,7 @@ export function ChatSidebar({
   onTriggerCronJob
 }: ChatSidebarProps) {
   const { t } = useI18n()
+  const { isMobile, setOpenMobile } = useSidebar()
   const s = t.sidebar
   const { pathname } = useLocation()
   // Contributed nav rows (plugins pairing a page with a sidebar entry) render
@@ -1067,6 +1069,33 @@ export function ChatSidebar({
       })
     )
 
+  // On iPhone the sidebar is a modal Sheet rather than a permanent desktop
+  // pane. Destination selections reveal the chat immediately; search and
+  // section toggles deliberately keep the drawer open.
+  const navigateAndClose = (item: SidebarNavItem) => {
+    onNavigate(item)
+
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }
+
+  const resumeAndClose = (sessionId: string) => {
+    onResumeSession(sessionId)
+
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }
+
+  const startSessionAndClose = (path: null | string) => {
+    onNewSessionInWorkspace(path)
+
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }
+
   return (
     <Sidebar
       className={cn(
@@ -1077,7 +1106,7 @@ export function ChatSidebar({
         panesFlipped ? 'border-l border-r-0' : 'border-r border-l-0',
         'border-(--sidebar-edge-border) bg-(--ui-sidebar-surface-background) opacity-100'
       )}
-      collapsible="none"
+      collapsible={isMobile ? 'offcanvas' : 'none'}
     >
       <SidebarContent className="gap-0 overflow-hidden bg-transparent px-2.5">
         <SidebarGroup className="shrink-0 p-0 pb-2 pt-[calc(var(--titlebar-height)+0.375rem)]">
@@ -1121,7 +1150,7 @@ export function ChatSidebar({
                         $newChatProfile.set(null)
                       }
 
-                      onNavigate(item)
+                      navigateAndClose(item)
                     }}
                     tooltip={s.nav[item.id] ?? item.label}
                     type="button"
@@ -1201,7 +1230,7 @@ export function ChatSidebar({
                 onArchiveSession={onArchiveSession}
                 onBranchSession={onBranchSession}
                 onDeleteSession={onDeleteSession}
-                onResumeSession={onResumeSession}
+                onResumeSession={resumeAndClose}
                 onToggle={() => undefined}
                 onTogglePin={pinSession}
                 open
@@ -1223,7 +1252,7 @@ export function ChatSidebar({
                 onBranchSession={onBranchSession}
                 onDeleteSession={onDeleteSession}
                 onReorderSessions={reorderPinned}
-                onResumeSession={onResumeSession}
+                onResumeSession={resumeAndClose}
                 onToggle={() => setSidebarPinsOpen(!pinsOpen)}
                 onTogglePin={unpinSession}
                 open={pinsOpen}
@@ -1281,7 +1310,7 @@ export function ChatSidebar({
                   inProject && enteredProject ? (
                     <div className="group/workspace flex shrink-0 items-center gap-0.5">
                       {enteredProject.path && (
-                        <StartWorkButton onStarted={onNewSessionInWorkspace} repoPath={enteredProject.path} />
+                        <StartWorkButton onStarted={startSessionAndClose} repoPath={enteredProject.path} />
                       )}
                       <ProjectMenu
                         isActive={enteredProject.id === activeProjectId}
@@ -1316,7 +1345,7 @@ export function ChatSidebar({
                             if (agentsGrouped) {
                               openProjectCreate()
                             } else {
-                              onNewSessionInWorkspace(null)
+                              startSessionAndClose(null)
                             }
                           }}
                           size="icon-xs"
@@ -1363,10 +1392,10 @@ export function ChatSidebar({
                 onBranchSession={onBranchSession}
                 onDeleteSession={onDeleteSession}
                 onEnterProject={onEnterProject}
-                onNewSessionInWorkspace={showAllProfiles ? undefined : onNewSessionInWorkspace}
+                onNewSessionInWorkspace={showAllProfiles ? undefined : startSessionAndClose}
                 onReorderProjects={showAllProfiles ? undefined : reorderProjects}
                 onReorderSessions={showAllProfiles ? undefined : reorderSessions}
-                onResumeSession={onResumeSession}
+                onResumeSession={resumeAndClose}
                 onToggle={() => setSidebarRecentsOpen(!agentsOpen)}
                 onTogglePin={pinSession}
                 open={agentsOpen}
@@ -1425,7 +1454,7 @@ export function ChatSidebar({
                     labelMeta={countLabel(group.sessions.length, group.total)}
                     onArchiveSession={onArchiveSession}
                     onDeleteSession={onDeleteSession}
-                    onResumeSession={onResumeSession}
+                    onResumeSession={resumeAndClose}
                     onToggle={() => toggleSidebarMessagingOpen(group.sourceId)}
                     onTogglePin={pinSession}
                     open={messagingOpenIds.includes(group.sourceId)}
@@ -1442,7 +1471,7 @@ export function ChatSidebar({
                 jobs={cronJobs}
                 label={s.cronJobs}
                 onManageJob={onManageCronJob}
-                onOpenRun={onResumeSession}
+                onOpenRun={resumeAndClose}
                 onToggle={() => setSidebarCronOpen(!cronOpen)}
                 onTriggerJob={onTriggerCronJob}
                 open={cronOpen}

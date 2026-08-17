@@ -137,7 +137,7 @@ An unused icon-generation package pulled in a large transitive development tree.
 
 - Hermes mobile renderer production build: passed.
 - Capacitor iOS sync and CocoaPods install: passed.
-- Node bridge tests: 12/12 passed.
+- Node bridge tests: 13/13 passed, including dark-mode seeding before renderer boot.
 - npm high-severity audit: zero vulnerabilities.
 - iOS Simulator compilation: `BUILD SUCCEEDED`.
 - Simulator install and launch: passed on iPhone 17 / iOS 26.2.
@@ -152,6 +152,24 @@ An unused icon-generation package pulled in a large transitive development tree.
 - Internal TestFlight group: created.
 - Nacho tester membership: confirmed in App Store Connect.
 
+## Build 2: replacing the desktop shell on iPhone
+
+Build 1 proved the difficult systems part: a TestFlight app could reach the real, tailnet-only Hermes backend and resume shared sessions. It also exposed the cost of treating a phone like a tiny desktop monitor. The desktop layout engine still mounted file, review, terminal, titlebar, and status surfaces. On a touch WebView, an invisible narrow-pane hover strip could synthesize a mouse event and reveal the file tree without a reliable way to dismiss or scroll it.
+
+Build 2 does not merely hide those pixels. Below the mobile breakpoint, `ContribController` uses a dedicated composition:
+
+- a safe-area-aware Mikey header with a 44-point conversations button;
+- the real Hermes session sidebar as an `88vw` modal drawer;
+- only the chat route as the primary content surface;
+- no desktop layout tree, file/review pane, terminal, titlebar, or status bar;
+- a fixed, safe-area-aware composer with mobile pop-out/drag behavior disabled.
+
+The session drawer keeps its own vertical scroll container. Choosing a session, destination, cron run, or new-session action closes it; search and expansion controls deliberately keep it open. The renderer is seeded to dark mode before its JavaScript graph loads, preventing a light first frame and keeping Markdown, sheets, code, and tool cards on one palette.
+
+The composer needed its own mobile adaptation. Desktop Git branch and repository `+/-` counters were removed on iPhone, the giant wordmark became a compact empty state, and thread changes no longer auto-focus the editor. That last detail matters because WKWebView can otherwise summon its input accessory and pan the whole shell beneath the notch.
+
+Visual QA on iPhone 17 / iOS 26.2 confirmed the drawer opens, scrolls through more than 30 sessions to its bottom navigation, and closes after a session is selected. The chat remains a single dark column and the accidental file-browser path is absent.
+
 ## Pitfalls for the next build
 
 1. Increment `CURRENT_PROJECT_VERSION`; Apple rejects duplicate build numbers.
@@ -161,7 +179,7 @@ An unused icon-generation package pulled in a large transitive development tree.
 5. Upload success is not installability. Wait for `VALID`, confirm export compliance, group attachment, and tester access.
 6. The iPhone must be connected to Nacho's tailnet; otherwise the intentionally private backend will be unreachable.
 7. Background WebSockets are constrained by iOS. Treat Mikey as a foreground workspace until APNs/background coordination is designed explicitly.
-8. The enormous `+/-` repository counters visible in the reused desktop renderer are not useful mobile UI and should be hidden or replaced in a future personal-polish pass.
+8. Keep desktop capabilities out of the mobile composition by default. Add a bounded mobile sheet intentionally if files or diffs become useful later; never reactivate invisible narrow-pane hover strips on touch devices.
 
 ## How good engineers should think about this
 

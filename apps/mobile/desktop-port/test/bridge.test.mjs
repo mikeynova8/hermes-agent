@@ -76,6 +76,9 @@ function loadBridge({ config = null, fetchImpl } = {}) {
   }
   vm.createContext(ctx)
   vm.runInContext(SHIM_SRC, ctx, { filename: 'hermes-web-shim.js' })
+  // Expose only the in-memory test double so assertions can verify pre-boot
+  // appearance seeding without changing the production bridge surface.
+  win.hermesDesktop.__testStore = store
   return win.hermesDesktop
 }
 
@@ -97,6 +100,14 @@ test('first launch uses Mikey tailnet connection without setup', async () => {
     await d.getGatewayWsUrl(),
     /^wss:\/\/mikeys-mac-mini\.tailaf453c\.ts\.net:9443\/api\/ws\?token=/,
   )
+})
+
+test('Mikey seeds the renderer dark mode before application boot', () => {
+  const d = loadBridge()
+  assert.equal(d.__testStore.get('hermes-desktop-mode-v1'), 'dark')
+  assert.equal(d.__testStore.get('hermes-desktop-active-profile-v1'), 'default')
+  assert.equal(d.__testStore.get('hermes-boot-color-scheme'), 'dark')
+  assert.equal(d.__testStore.get('hermes-boot-background'), '#0d0d0e')
 })
 
 test('the bridge loads headlessly and exposes the expected surface', () => {

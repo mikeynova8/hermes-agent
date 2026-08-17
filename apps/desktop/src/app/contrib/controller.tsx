@@ -27,11 +27,12 @@ import {
   setTreePaneHidden,
   watchContributedPanes
 } from '@/components/pane-shell/tree/store'
-import { SidebarProvider } from '@/components/ui/sidebar'
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { discoverBundledPlugins } from '@/contrib/plugins'
 import { Slot } from '@/contrib/react/slot'
 import { registry } from '@/contrib/registry'
 import { discoverRuntimePlugins } from '@/contrib/runtime-loader'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
 import { LayoutDashboard } from '@/lib/icons'
 import { type KeybindContribution, KEYBINDS_AREA } from '@/lib/keybinds/actions'
@@ -593,6 +594,7 @@ $filePreviewTarget.listen(target => target && revealPreview())
 
 export function ContribController() {
   const sidebarOpen = useStore($sidebarOpen)
+  const isMobile = useIsMobile()
 
   return (
     <SidebarProvider
@@ -602,11 +604,42 @@ export function ContribController() {
       style={{ '--sidebar-width': '100%' } as CSSProperties}
     >
       <ContribWiring>
-        <div
-          className="flex h-screen min-h-0 w-screen flex-col bg-(--ui-bg-chrome) text-(--ui-text-primary)"
-          style={{ '--titlebar-height': '0px' } as CSSProperties}
-        >
-          {/* Title bar: fixed chrome outside the grid, composable via slots.
+        {isMobile ? (
+          <div
+            className="flex h-[100dvh] min-h-0 w-screen max-w-full flex-col overflow-hidden bg-background text-(--ui-text-primary)"
+            data-mikey-mobile-shell=""
+            style={{ '--titlebar-height': '0px' } as CSSProperties}
+          >
+            {/* ChatSidebar becomes a native-feeling Sheet on mobile. Keeping it
+                mounted here preserves the real session/search/project data while
+                removing every desktop-only pane from the mobile composition. */}
+            <WiredPane part="sidebar" />
+
+            <header
+              className="z-40 flex shrink-0 items-center gap-3 border-b border-(--ui-stroke-tertiary) bg-(--ui-bg-chrome)/95 px-3 pb-2.5 pt-2.5 backdrop-blur-xl"
+              data-mikey-mobile-header=""
+              style={{ paddingTop: 'max(0.625rem, env(safe-area-inset-top))' }}
+            >
+              <SidebarTrigger
+                aria-label="Open conversations"
+                className="size-10 shrink-0 rounded-xl border border-(--ui-stroke-secondary) bg-(--ui-control-background) text-(--ui-text-primary) shadow-sm"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[0.95rem] font-semibold tracking-tight">Mikey</div>
+                <div className="truncate text-[0.68rem] text-(--ui-text-tertiary)">Your Hermes workspace</div>
+              </div>
+            </header>
+
+            <main className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-(--ui-chat-surface-background)">
+              <WiredPane part="chatRoutes" />
+            </main>
+          </div>
+        ) : (
+          <div
+            className="flex h-screen min-h-0 w-screen flex-col bg-(--ui-bg-chrome) text-(--ui-text-primary)"
+            style={{ '--titlebar-height': '0px' } as CSSProperties}
+          >
+            {/* Title bar: fixed chrome outside the grid, composable via slots.
               Layout contract (no contribution can break it):
                 - a full-bar DRAG BASE underneath (pointer-events-none, like
                   AppShell's drag strips) — everywhere without content drags
@@ -617,52 +650,53 @@ export function ContribController() {
                   tree-published --workspace-left/right vars (pure CSS, no rect
                   threading), clamped to clear the REAL TitlebarControls
                   clusters (fixed, z-70); center is truly window-centered. */}
-          <div className="relative flex h-[34px] shrink-0 items-center border-b border-(--ui-stroke-tertiary) text-xs">
-            {/* Drag strips, AppShell-style: cut to AVOID the fixed control
+            <div className="relative flex h-[34px] shrink-0 items-center border-b border-(--ui-stroke-tertiary) text-xs">
+              {/* Drag strips, AppShell-style: cut to AVOID the fixed control
                 clusters instead of overlapping them — Electron's no-drag
                 carve-out of fixed/transformed elements is unreliable, so a
                 full-bar drag base kills their clicks. In-flow slot content
                 still carves via its own no-drag wrapper (the same pattern as
                 the app's session-title button). */}
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 left-0 w-(--titlebar-controls-left,14px) [-webkit-app-region:drag]"
-            />
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 left-[calc(var(--titlebar-controls-left,14px)+(var(--titlebar-control-size,1.25rem)*2)+0.75rem)] right-[calc(var(--titlebar-tools-right,0.75rem)+var(--titlebar-tools-width,5.5rem)+0.75rem)] [-webkit-app-region:drag]"
-            />
-            <div
-              className="pointer-events-auto absolute z-10 flex w-max items-center gap-2 [-webkit-app-region:no-drag]"
-              style={{
-                left: 'max(calc(var(--workspace-left, 0px) + 0.5rem), calc(var(--titlebar-controls-left, 14px) + 2 * var(--titlebar-control-size, 1.25rem) + 1rem))'
-              }}
-            >
-              <Slot area="titleBar.left" />
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-0 left-0 w-(--titlebar-controls-left,14px) [-webkit-app-region:drag]"
+              />
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-0 left-[calc(var(--titlebar-controls-left,14px)+(var(--titlebar-control-size,1.25rem)*2)+0.75rem)] right-[calc(var(--titlebar-tools-right,0.75rem)+var(--titlebar-tools-width,5.5rem)+0.75rem)] [-webkit-app-region:drag]"
+              />
+              <div
+                className="pointer-events-auto absolute z-10 flex w-max items-center gap-2 [-webkit-app-region:no-drag]"
+                style={{
+                  left: 'max(calc(var(--workspace-left, 0px) + 0.5rem), calc(var(--titlebar-controls-left, 14px) + 2 * var(--titlebar-control-size, 1.25rem) + 1rem))'
+                }}
+              >
+                <Slot area="titleBar.left" />
+              </div>
+              <div className="pointer-events-auto absolute left-1/2 top-1/2 z-10 flex w-max -translate-x-1/2 -translate-y-1/2 items-center gap-2 [-webkit-app-region:no-drag]">
+                <Slot area="titleBar.center" />
+              </div>
+              <div
+                className="pointer-events-auto absolute z-10 flex w-max items-center gap-2 [-webkit-app-region:no-drag]"
+                style={{
+                  right:
+                    'max(calc(var(--workspace-right, 0px) + 0.5rem), calc(var(--titlebar-tools-right, 0.75rem) + 4 * (var(--titlebar-control-size, 1.25rem) + 0.25rem) + 0.5rem))'
+                }}
+              >
+                <Slot area="titleBar.right" />
+              </div>
             </div>
-            <div className="pointer-events-auto absolute left-1/2 top-1/2 z-10 flex w-max -translate-x-1/2 -translate-y-1/2 items-center gap-2 [-webkit-app-region:no-drag]">
-              <Slot area="titleBar.center" />
-            </div>
-            <div
-              className="pointer-events-auto absolute z-10 flex w-max items-center gap-2 [-webkit-app-region:no-drag]"
-              style={{
-                right:
-                  'max(calc(var(--workspace-right, 0px) + 0.5rem), calc(var(--titlebar-tools-right, 0.75rem) + 4 * (var(--titlebar-control-size, 1.25rem) + 0.25rem) + 0.5rem))'
-              }}
-            >
-              <Slot area="titleBar.right" />
-            </div>
-          </div>
 
-          <LayoutTreeRoot />
+            <LayoutTreeRoot />
 
-          {/* "Close running tab?" — the busy/input-blocked tile close gate. */}
-          <SessionTileCloseConfirm />
+            {/* "Close running tab?" — the busy/input-blocked tile close gate. */}
+            <SessionTileCloseConfirm />
 
-          {/* The REAL statusbar (model pill, command center, agents, …) with
+            {/* The REAL statusbar (model pill, command center, agents, …) with
               statusBar.left/right contributions merged in. */}
-          <WiredPane part="statusbar" />
-        </div>
+            <WiredPane part="statusbar" />
+          </div>
+        )}
       </ContribWiring>
     </SidebarProvider>
   )

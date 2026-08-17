@@ -1,5 +1,6 @@
 import { type CSSProperties, useState } from 'react'
 
+import { useIsMobile } from '@/hooks/use-mobile'
 import { capitalize, normalize } from '@/lib/text'
 
 import introCopyJsonl from './intro-copy.jsonl?raw'
@@ -157,8 +158,21 @@ function resolveCopy(personality?: string, seed?: number): IntroCopy {
 }
 
 export function Intro({ personality, seed }: IntroProps) {
+  const isMobile = useIsMobile()
   const [mountSeed] = useState(() => Math.floor(Math.random() * 100000))
   const copy = resolveCopy(personality, mountSeed + (seed ?? 0))
+
+  if (isMobile) {
+    return (
+      <div
+        className="pointer-events-none mx-auto flex w-full max-w-sm flex-col items-center justify-center gap-2 px-6 py-8 text-center"
+        data-slot="aui_intro"
+      >
+        <p className="m-0 text-balance text-xl font-semibold tracking-tight text-foreground">{copy.headline}</p>
+        <p className="m-0 text-pretty text-sm leading-relaxed text-muted-foreground">{copy.body}</p>
+      </div>
+    )
+  }
 
   return (
     <div
