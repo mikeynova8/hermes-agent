@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDown as ScrollDownIcon,
   ArrowUp as SendIcon,
+  Bot as BotIcon,
   ChevronDown as ChevronIcon,
   ChevronLeft as BackIcon,
   FilePlus2 as ActivityIcon,
   Folder as FolderIcon,
   Menu as MenuIcon,
+  MessageSquare as ChatsIcon,
   Plus as PlusIcon,
   SquarePen as ComposeIcon
 } from 'lucide-react'
@@ -16,6 +18,16 @@ import {
   type ConnectionState,
   type GatewayEvent
 } from '../../shared/src/json-rpc-gateway'
+import {
+  botColor,
+  botDescription,
+  botDisplayName,
+  botAppearance,
+  canonicalBotSession,
+  loadBots,
+  pinBotChat,
+  type BotProfile
+} from './bots/api'
 import { dateLabel, formatTime, sameCalendarDay, transcriptMessages } from './chat/format'
 import { friendlyError } from './chat/errors'
 import { reduceGatewayEvent } from './chat/event-reducer'
@@ -45,8 +57,18 @@ interface CreateResult {
   messages?: TranscriptMessage[]
 }
 
+type DrawerMode = 'chats' | 'bots'
+
 function sessionTitle(session: SessionInfo): string {
   return session.title?.trim() || session.preview?.trim() || 'New conversation'
+}
+
+function BotAvatar({ bot }: { bot: BotProfile }) {
+  return (
+    <span className="bot-avatar" style={{ background: botColor(bot) }} aria-hidden="true">
+      {botDisplayName(bot).slice(0, 1).toUpperCase()}
+    </span>
+  )
 }
 
 function activitySummary(thread: ThreadState) {
@@ -66,7 +88,11 @@ export function App() {
   const [thread, setThread] = useState<ThreadState>(EMPTY_THREAD)
   const [connection, setConnection] = useState<ConnectionState>('idle')
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerMode, setDrawerMode] = useState<DrawerMode>('chats')
   const [query, setQuery] = useState('')
+  const [bots, setBots] = useState<BotProfile[]>([])
+  const [botsLoading, setBotsLoading] = useState(false)
+  const [activeBot, setActiveBot] = useState<BotProfile | null>(null)
   const [projectTree, setProjectTree] = useState<ProjectTreeNode[]>([])
   const [projectScope, setProjectScope] = useState<ProjectTreeNode | null>(null)
   const [projectSessions, setProjectSessions] = useState<ProjectSession[]>([])
@@ -103,6 +129,20 @@ export function App() {
     if (!gateway || gateway.connectionState !== 'open') return
     const result = await loadProjects(gateway)
     setProjectTree(result.tree)
+  }, [])
+
+  const refreshBots = useCallback(async () => {
+    const gateway = gatewayRef.current
+    if (!gateway || gateway.connectionState !== 'open') return []
+    setBotsLoading(true)
+    try {
+      const roster = await loadBots(gateway)
+      const visible = (roster.profiles ?? []).filter(profile => !profile.ui_meta?.['hermes-bots'] || !(profile.ui_meta['hermes-bots'] as { hidden?: boolean }).hidden)
+      setBots(visible)
+      return visible
+    } finally {
+      setBotsLoading(false)
+    }
   }, [])
 
   const openProject = async (project: ProjectTreeNode) => {
@@ -146,19 +186,20 @@ export function App() {
     }
   }
 
-  const resumeSession = useCallback(async (storedId: string, fallback = true) => {
+  const resumeSession = useCallback(async (storedId: string, fallback = true, profile?: string) => {
     forceBottomRef.current = true
     followBottomRef.current = true
     setShowScrollDown(false)
     setSelectedId(storedId)
-    window.localStorage.setItem('mikey.lastSessionId', storedId)
+    if (profile) window.localStorage.setItem('mikey.lastBotName', profile)
+    else window.localStorage.setItem('mikey.lastSessionId', storedId)
     setDrawerOpen(false)
     setError(null)
     setThread({ ...EMPTY_THREAD, storedId })
 
     if (fallback) {
       try {
-        const history = await loadSessionMessages(storedId)
+        const history = await loadSessionMessages(storedId, profile)
         setThread({
           ...EMPTY_THREAD,
           storedId,
@@ -178,6 +219,7 @@ export function App() {
       const result = await gateway.request<ResumeResult>('session.resume', {
         session_id: storedId,
         cols: 80,
+        ...(profile ? { profile } : {}),
         source: 'mikey-ios'
       })
       if (selectedRef.current !== storedId) return
@@ -206,12 +248,58 @@ export function App() {
     }
   }, [])
 
+  const openBot = useCallback(async (bot: BotProfile) => {
+    setActiveBot(bot)
+    setDrawerMode('bots')
+    setProjectScope(null)
+    setProjectSessions([])
+    setQuery('')
+    setDrawerOpen(false)
+    setDraft('')
+    setAttachments([])
+    setError(null)
+    window.localStorage.setItem('mikey.lastBotName', bot.name)
+
+    const target = canonicalBotSession(bot)
+    if (!target) {
+      selectedRef.current = null
+      setSelectedId(null)
+      setThread(EMPTY_THREAD)
+      return
+    }
+
+    selectedRef.current = target
+    await resumeSession(target, true, bot.name)
+    const gateway = gatewayRef.current
+    if (gateway?.connectionState === 'open' && !botAppearance(bot).chat) {
+      await pinBotChat(gateway, bot, target).catch(() => undefined)
+      await refreshBots().catch(() => undefined)
+    }
+  }, [refreshBots, resumeSession])
+
   const connect = useCallback(async () => {
     if (gatewayRef.current?.connectionState === 'connecting' || gatewayRef.current?.connectionState === 'open') return
 
     const gateway = new JsonRpcGatewayClient({ requestIdPrefix: 'mikey' })
     gatewayRef.current = gateway
-    gateway.onState(setConnection)
+    gateway.onState(state => {
+      setConnection(state)
+      if (state === 'open') {
+        reconnectAttemptRef.current = 0
+        if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current)
+        reconnectTimerRef.current = null
+        return
+      }
+      if ((state === 'closed' || state === 'error') && gatewayRef.current === gateway) {
+        if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current)
+        const delays = [1_000, 2_000, 4_000, 8_000, 15_000]
+        const delay = delays[Math.min(reconnectAttemptRef.current++, delays.length - 1)]
+        reconnectTimerRef.current = window.setTimeout(() => {
+          reconnectTimerRef.current = null
+          void connect()
+        }, delay)
+      }
+    })
     gateway.onEvent((event: GatewayEvent) => setThread(current => reduceGatewayEvent(current, event)))
 
     try {
@@ -220,9 +308,6 @@ export function App() {
       setError(null)
     } catch (cause) {
       setError(friendlyError(cause, 'Could not connect to Mikey'))
-      const delays = [1_000, 2_000, 4_000, 8_000, 15_000]
-      const delay = delays[Math.min(reconnectAttemptRef.current++, delays.length - 1)]
-      reconnectTimerRef.current = window.setTimeout(connect, delay)
     }
   }, [resumeSession])
 
@@ -250,7 +335,9 @@ export function App() {
       if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current)
       window.removeEventListener('online', reconnectNow)
       document.removeEventListener('visibilitychange', reconnectNow)
-      gatewayRef.current?.close()
+      const gateway = gatewayRef.current
+      gatewayRef.current = null
+      gateway?.close()
     }
   }, [connect, loadIndex, resumeSession])
 
@@ -258,15 +345,18 @@ export function App() {
   // them declaratively so either completion order restores the selected chat.
   useEffect(() => {
     if (connection !== 'open' || !selectedId || thread.runtimeId) return
-    void resumeSession(selectedId, true)
-  }, [connection, resumeSession, selectedId, thread.runtimeId])
+    void resumeSession(selectedId, true, activeBot?.name)
+  }, [activeBot?.name, connection, resumeSession, selectedId, thread.runtimeId])
 
   useEffect(() => {
     if (connection !== 'open') return
     void refreshProjects().catch(cause =>
       setError(friendlyError(cause, 'Could not load projects'))
     )
-  }, [connection, refreshProjects])
+    void refreshBots().catch(cause =>
+      setError(friendlyError(cause, 'Could not load Bots'))
+    )
+  }, [connection, refreshBots, refreshProjects])
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     const node = timelineRef.current
@@ -320,6 +410,9 @@ export function App() {
     setSelectedId(null)
     selectedRef.current = null
     window.localStorage.removeItem('mikey.lastSessionId')
+    window.localStorage.removeItem('mikey.lastBotName')
+    setActiveBot(null)
+    setDrawerMode('chats')
     setThread(EMPTY_THREAD)
     setDraft('')
     setAttachments([])
@@ -331,11 +424,32 @@ export function App() {
     if (thread.runtimeId) return thread.runtimeId
     const gateway = gatewayRef.current
     if (!gateway || gateway.connectionState !== 'open') throw new Error('Mikey is reconnecting')
-    const result = await gateway.request<CreateResult>('session.create', newSessionParams(projectScope))
+    const result = await gateway.request<CreateResult>(
+      'session.create',
+      activeBot
+        ? { profile: activeBot.name, title: 'Bot Chat', hidden: true, source: 'mikey-ios' }
+        : newSessionParams(projectScope)
+    )
+    const storedId = result.stored_session_id ?? thread.storedId
+    if (activeBot && storedId) {
+      await pinBotChat(gateway, activeBot, storedId)
+      const nextBot: BotProfile = {
+        ...activeBot,
+        ui_meta: {
+          ...(activeBot.ui_meta ?? {}),
+          'hermes-bots': { ...botAppearance(activeBot), chat: storedId }
+        }
+      }
+      setActiveBot(nextBot)
+      setBots(current => current.map(bot => bot.name === nextBot.name ? nextBot : bot))
+      setSelectedId(storedId)
+      selectedRef.current = storedId
+      window.localStorage.setItem('mikey.lastBotName', activeBot.name)
+    }
     setThread(current => ({
       ...current,
       runtimeId: result.session_id,
-      storedId: result.stored_session_id ?? current.storedId,
+      storedId: storedId ?? current.storedId,
       messages: transcriptMessages(result.messages ?? [])
     }))
     return result.session_id
@@ -394,8 +508,14 @@ export function App() {
     return source.filter(session => `${sessionTitle(session)} ${session.preview ?? ''}`.toLowerCase().includes(normalized))
   }, [projectScope, projectSessions, query, sessions])
 
+  const filteredBots = useMemo(() => {
+    const normalized = query.trim().toLowerCase()
+    if (!normalized) return bots
+    return bots.filter(bot => `${botDisplayName(bot)} ${bot.name} ${botDescription(bot)}`.toLowerCase().includes(normalized))
+  }, [bots, query])
+
   const selectedSession = [...projectSessions, ...sessions].find(session => session.id === selectedId)
-  const headerTitle = selectedSession ? sessionTitle(selectedSession) : projectScope?.label || 'Mikey'
+  const headerTitle = activeBot ? botDisplayName(activeBot) : selectedSession ? sessionTitle(selectedSession) : projectScope?.label || 'Mikey'
   const visibleProjects = projectTree.filter(project => !project.isNoProject)
   const activity = activitySummary(thread)
 
@@ -421,7 +541,9 @@ export function App() {
       <main className="timeline" ref={timelineRef} aria-live="polite" onScroll={updateScrollState}>
         {thread.messages.length === 0 && !thread.busy ? (
           <section className="empty-state">
-            <h2>What can I help with?</h2>
+            {activeBot && <BotAvatar bot={activeBot} />}
+            <h2>{activeBot ? `Message ${botDisplayName(activeBot)}` : 'What can I help with?'}</h2>
+            {activeBot && <p>{botDescription(activeBot)}</p>}
           </section>
         ) : (
           <div className="message-list">
@@ -488,8 +610,8 @@ export function App() {
             onChange={event => setAttachments(Array.from(event.target.files ?? []))}
           />
           <textarea
-            aria-label="Message Mikey"
-            placeholder="Message Mikey"
+            aria-label={`Message ${activeBot ? botDisplayName(activeBot) : 'Mikey'}`}
+            placeholder={`Message ${activeBot ? botDisplayName(activeBot) : 'Mikey'}`}
             rows={1}
             value={draft}
             onChange={event => setDraft(event.target.value)}
@@ -516,57 +638,112 @@ export function App() {
         <aside className="drawer" aria-label="Conversations">
           <div className="drawer-safe-top" />
           <div className="drawer-header">
-            {projectScope && (
+            {projectScope && drawerMode === 'chats' && (
               <button className="drawer-back" aria-label="All projects" onClick={() => { setProjectScope(null); setProjectSessions([]); setQuery('') }}>
                 <BackIcon />
               </button>
             )}
-            <h2>{projectScope?.label || 'Mikey'}</h2>
-            <button className="small-new-button" onClick={startNew}><ComposeIcon /> New</button>
-          </div>
-          <div className="search-wrap">
-            <input aria-label="Search conversations" placeholder="Search chats" value={query} onChange={event => setQuery(event.target.value)} />
+            <h2>{projectScope && drawerMode === 'chats' ? projectScope.label : 'Mikey'}</h2>
+            {drawerMode === 'chats' && <button className="small-new-button" onClick={startNew}><ComposeIcon /> New</button>}
           </div>
 
-          {!projectScope && !query.trim() && (
-            <section className="projects-section">
-              <div className="drawer-section-heading">
-                <span>Projects</span>
-                <button aria-label="Create project" onClick={() => setProjectSheetOpen(true)}><PlusIcon /></button>
-              </div>
-              <div className="project-list">
-                {visibleProjects.map(project => (
-                  <button className="project-row" key={project.id} onClick={() => void openProject(project)}>
-                    <span className="project-icon" style={project.color ? { color: project.color } : undefined}>
-                      {project.icon || <FolderIcon />}
-                    </span>
-                    <span className="project-copy">
-                      <strong>{project.label}</strong>
-                      <small>{project.sessionCount} {project.sessionCount === 1 ? 'chat' : 'chats'}</small>
-                    </span>
-                    <ChevronIcon />
-                  </button>
-                ))}
-                {visibleProjects.length === 0 && <p className="projects-empty">Create a project to group chats by workspace.</p>}
-              </div>
-            </section>
+          {!projectScope && (
+            <div className="drawer-mode-tabs" role="tablist" aria-label="Mikey modes">
+              <button
+                className={drawerMode === 'chats' ? 'is-active' : ''}
+                role="tab"
+                aria-selected={drawerMode === 'chats'}
+                onClick={() => { setDrawerMode('chats'); setQuery('') }}
+              >
+                <ChatsIcon /> Chats
+              </button>
+              <button
+                className={drawerMode === 'bots' ? 'is-active' : ''}
+                role="tab"
+                aria-selected={drawerMode === 'bots'}
+                onClick={() => { setDrawerMode('bots'); setProjectScope(null); setProjectSessions([]); setQuery('') }}
+              >
+                <BotIcon /> Bots
+              </button>
+            </div>
           )}
 
-          <div className="drawer-section-heading chats-heading">
-            <span>{projectScope ? 'Chats' : query.trim() ? 'Results' : 'Recent'}</span>
+          <div className="search-wrap">
+            <input
+              aria-label={drawerMode === 'bots' ? 'Search Bots' : 'Search conversations'}
+              placeholder={drawerMode === 'bots' ? 'Search Bots' : 'Search chats'}
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+            />
           </div>
-          <nav className="session-list">
-            {projectScope && projectLoading && <p className="session-list-status">Loading chats…</p>}
-            {filteredSessions.map(session => (
-              <button
-                className={`session-row ${session.id === selectedId ? 'is-selected' : ''}`}
-                key={session.id}
-                onClick={() => void resumeSession(session.id)}
-              >
-                <span className="session-row-title">{sessionTitle(session)}</span>
-              </button>
-            ))}
-          </nav>
+
+          {drawerMode === 'chats' ? (
+            <>
+              {!projectScope && !query.trim() && (
+                <section className="projects-section">
+                  <div className="drawer-section-heading">
+                    <span>Projects</span>
+                    <button aria-label="Create project" onClick={() => setProjectSheetOpen(true)}><PlusIcon /></button>
+                  </div>
+                  <div className="project-list">
+                    {visibleProjects.map(project => (
+                      <button className="project-row" key={project.id} onClick={() => void openProject(project)}>
+                        <span className="project-icon" style={project.color ? { color: project.color } : undefined}>
+                          {project.icon || <FolderIcon />}
+                        </span>
+                        <span className="project-copy">
+                          <strong>{project.label}</strong>
+                          <small>{project.sessionCount} {project.sessionCount === 1 ? 'chat' : 'chats'}</small>
+                        </span>
+                        <ChevronIcon />
+                      </button>
+                    ))}
+                    {visibleProjects.length === 0 && <p className="projects-empty">Create a project to group chats by workspace.</p>}
+                  </div>
+                </section>
+              )}
+
+              <div className="drawer-section-heading chats-heading">
+                <span>{projectScope ? 'Chats' : query.trim() ? 'Results' : 'Recent'}</span>
+              </div>
+              <nav className="session-list">
+                {projectScope && projectLoading && <p className="session-list-status">Loading chats…</p>}
+                {filteredSessions.map(session => (
+                  <button
+                    className={`session-row ${!activeBot && session.id === selectedId ? 'is-selected' : ''}`}
+                    key={session.id}
+                    onClick={() => { setActiveBot(null); setDrawerMode('chats'); void resumeSession(session.id) }}
+                  >
+                    <span className="session-row-title">{sessionTitle(session)}</span>
+                  </button>
+                ))}
+              </nav>
+            </>
+          ) : (
+            <section className="bots-section">
+              <div className="drawer-section-heading chats-heading">
+                <span>Your Bots</span>
+                <small>{bots.length}</small>
+              </div>
+              <nav className="bot-list">
+                {botsLoading && bots.length === 0 && <p className="session-list-status">Loading Bots…</p>}
+                {filteredBots.map(bot => (
+                  <button
+                    className={`bot-row ${activeBot?.name === bot.name ? 'is-selected' : ''}`}
+                    key={bot.name}
+                    onClick={() => void openBot(bot)}
+                  >
+                    <BotAvatar bot={bot} />
+                    <span className="bot-row-copy">
+                      <strong>{botDisplayName(bot)}</strong>
+                      <small>{botDescription(bot)}</small>
+                    </span>
+                  </button>
+                ))}
+                {!botsLoading && filteredBots.length === 0 && <p className="projects-empty">No Bots found.</p>}
+              </nav>
+            </section>
+          )}
         </aside>
       </div>
 

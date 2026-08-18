@@ -69,6 +69,7 @@ export async function listSessions(limit = 60): Promise<SessionListResponse> {
   }
 }
 
-export function loadSessionMessages(id: string): Promise<SessionMessagesResponse> {
-  return hermesFetch(`/api/sessions/${encodeURIComponent(id)}/messages`)
+export function loadSessionMessages(id: string, profile?: string): Promise<SessionMessagesResponse> {
+  const query = profile ? `?profile=${encodeURIComponent(profile)}` : ''
+  return hermesFetch(`/api/sessions/${encodeURIComponent(id)}/messages${query}`)
 }

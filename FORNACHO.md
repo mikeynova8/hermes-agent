@@ -91,7 +91,7 @@ App Store Connect names are globally unique, and “Mikey” was already taken. 
 - Display name: **Mikey**
 - App Store Connect record: **Mikey Agent**
 - Bundle ID: `com.ignacioiacovino.mikey`
-- Version/build: `1.0 (6)`
+- Version/build: `1.0 (7)`
 - Apple team: `JXF76W23J6`
 - App Store Connect app ID: `6802144898`
 
@@ -208,6 +208,23 @@ The upgrade regression seeds Build 4's last-selected ID with a real gratitude cr
 Build 5 fixed automation-session leakage but was intentionally not assigned to testers after a second audit found that rejected JSON-RPC requests could still render `cause.message` verbatim. Build 6 routes every banner and gateway error through a small classifier. Oversized-session failures become “This chat is too large to continue live. Start a new chat to keep going,” connection failures become calm retry copy, and unknown failures use operation-specific fallbacks. Exact counts, configuration keys, raw JSON-RPC objects, exception text, and backend names never enter the primary transcript or banner.
 
 Regression coverage exercises both the rejected `session.resume` path and asynchronous gateway `error` events, and asserts that `active messages`, `max_resume_messages`, `config.yaml`, and exact limits are absent.
+
+## Build 7: Bot Mode is profile routing, not a second chat system
+
+Hermes 0.20.4 introduced Bot Mode around profiles. Mikey follows that backend contract instead of inventing mobile-only agents:
+
+- the drawer has an explicit **Chats / Bots** switch;
+- `profiles.list` supplies the live roster, display metadata, descriptions, colors, and profile models;
+- each profile owns one server-synced canonical `Bot Chat`, stored in `ui_meta.hermes-bots.chat`;
+- an existing latest profile session is adopted on first open so upgrading does not discard history;
+- history REST calls, `session.create`, and `session.resume` carry the selected profile;
+- the ordinary structured gateway still carries streaming text, tools, approvals, and `@bot` protocol events.
+
+The roster intentionally does **not** show latest-message previews. Hermes profile previews can currently point at scheduler or synthetic turns without explicit display provenance, so showing them would recreate Build 5's privacy leak. Identity and profile description are safe; message previews remain hidden until the backend marks them user-visible.
+
+Updating Hermes also tightened WebSocket Origin checks. The tailnet-only Caddy proxy now rewrites the upstream Origin to the trusted loopback dashboard origin while leaving the client connection private and authenticated. A production-bundle E2E opened the real Home profile, loaded its canonical history, sent `Reply with exactly: BOT MODE OK`, observed streaming, received `BOT MODE OK`, and remained connected. The mobile suite contains 31 passing tests.
+
+Build 7 also reconnects after an already-open WebSocket closes, covering transient proxy restarts and iOS foreground/sleep transitions rather than only initial connection failures.
 
 ## Pitfalls for the next build
 
