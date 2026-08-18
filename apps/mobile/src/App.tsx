@@ -17,6 +17,7 @@ import {
   type GatewayEvent
 } from '../../shared/src/json-rpc-gateway'
 import { dateLabel, formatTime, sameCalendarDay, transcriptMessages } from './chat/format'
+import { friendlyError } from './chat/errors'
 import { reduceGatewayEvent } from './chat/event-reducer'
 import { newSessionParams } from './chat/session-create'
 import { isNearBottom } from './chat/scroll'
@@ -114,7 +115,7 @@ export function App() {
     try {
       setProjectSessions(await loadProjectSessions(gateway, project.id))
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not load this project')
+      setError(friendlyError(cause, 'Could not load this project'))
     } finally {
       setProjectLoading(false)
     }
@@ -139,7 +140,7 @@ export function App() {
       setProjectName('')
       setProjectPath('')
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not create project')
+      setError(friendlyError(cause, 'Could not create project'))
     } finally {
       setProjectSaving(false)
     }
@@ -164,7 +165,7 @@ export function App() {
           messages: transcriptMessages(history.messages)
         })
       } catch (cause) {
-        setError(cause instanceof Error ? `Could not load history: ${cause.message}` : 'Could not load history')
+        setError(friendlyError(cause, 'Could not load this conversation'))
       }
     }
 
@@ -199,7 +200,7 @@ export function App() {
         }
       })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not resume this conversation')
+      setError(friendlyError(cause, 'Could not resume this conversation'))
     } finally {
       if (resumeInFlightRef.current === storedId) resumeInFlightRef.current = null
     }
@@ -218,7 +219,7 @@ export function App() {
       reconnectAttemptRef.current = 0
       setError(null)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not connect to Hermes')
+      setError(friendlyError(cause, 'Could not connect to Mikey'))
       const delays = [1_000, 2_000, 4_000, 8_000, 15_000]
       const delay = delays[Math.min(reconnectAttemptRef.current++, delays.length - 1)]
       reconnectTimerRef.current = window.setTimeout(connect, delay)
@@ -235,7 +236,7 @@ export function App() {
         selectedRef.current = lastSessionId
         await resumeSession(lastSessionId)
       })
-      .catch(cause => setError(cause instanceof Error ? cause.message : 'Could not load conversations'))
+      .catch(cause => setError(friendlyError(cause, 'Could not load conversations')))
     void connect()
 
     const reconnectNow = () => {
@@ -263,7 +264,7 @@ export function App() {
   useEffect(() => {
     if (connection !== 'open') return
     void refreshProjects().catch(cause =>
-      setError(cause instanceof Error ? cause.message : 'Could not load projects')
+      setError(friendlyError(cause, 'Could not load projects'))
     )
   }, [connection, refreshProjects])
 
@@ -382,7 +383,7 @@ export function App() {
       await gateway.request('prompt.submit', { session_id: runtimeId, text: text || 'Please review the attached image.' })
     } catch (cause) {
       setThread(current => ({ ...current, busy: false }))
-      setError(cause instanceof Error ? cause.message : 'Message could not be sent')
+      setError(friendlyError(cause, 'Message could not be sent'))
     }
   }
 

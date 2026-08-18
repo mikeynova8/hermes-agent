@@ -91,7 +91,7 @@ App Store Connect names are globally unique, and “Mikey” was already taken. 
 - Display name: **Mikey**
 - App Store Connect record: **Mikey Agent**
 - Bundle ID: `com.ignacioiacovino.mikey`
-- Version/build: `1.0 (5)`
+- Version/build: `1.0 (6)`
 - Apple team: `JXF76W23J6`
 - App Store Connect app ID: `6802144898`
 
@@ -202,6 +202,12 @@ Build 4 exposed a cron run as a normal chat. Its first `user` row was actually t
 Mikey now excludes operational `cron`, `subagent`, and retrieval-verification sessions from the conversation drawer while retaining interactive Telegram, CLI, Desktop, Mikey, and other messaging sessions. Because recent history can be dominated by automation, the client uses bounded 60-row pagination until it has 60 real conversations instead of issuing one oversized request or leaving the drawer empty.
 
 The upgrade regression seeds Build 4's last-selected ID with a real gratitude cron session, reloads the app, and proves that the synthetic prompt is absent, the cron title is absent, the stale selection is not resumed, the new-chat state remains usable, and 60 interactive chats are still listed.
+
+## Build 6: errors are product copy, not backend output
+
+Build 5 fixed automation-session leakage but was intentionally not assigned to testers after a second audit found that rejected JSON-RPC requests could still render `cause.message` verbatim. Build 6 routes every banner and gateway error through a small classifier. Oversized-session failures become “This chat is too large to continue live. Start a new chat to keep going,” connection failures become calm retry copy, and unknown failures use operation-specific fallbacks. Exact counts, configuration keys, raw JSON-RPC objects, exception text, and backend names never enter the primary transcript or banner.
+
+Regression coverage exercises both the rejected `session.resume` path and asynchronous gateway `error` events, and asserts that `active messages`, `max_resume_messages`, `config.yaml`, and exact limits are absent.
 
 ## Pitfalls for the next build
 

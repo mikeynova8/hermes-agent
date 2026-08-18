@@ -1,4 +1,5 @@
 import type { GatewayEvent } from '../../../shared/src/json-rpc-gateway'
+import { friendlyError } from './errors'
 import { contentText, timestampMs } from './format'
 import type { ThreadState, ToolActivity } from './types'
 
@@ -124,7 +125,8 @@ export function reduceGatewayEvent(state: ThreadState, event: GatewayEvent, now 
       }
     }
     case 'error': {
-      const message = eventText(data) || String(data.message ?? 'Hermes encountered an error')
+      const raw = eventText(data) || String(data.message ?? '')
+      const message = friendlyError(raw, 'Something went wrong. Please try again.')
       return {
         ...state,
         busy: false,

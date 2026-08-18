@@ -35,4 +35,15 @@ describe('reduceGatewayEvent', () => {
     expect(done.messages).toHaveLength(0)
     expect(done.activities[0]).toMatchObject({ id: 't1', name: 'read_file', status: 'complete', completedAt: 5_000 })
   })
+
+  it('never renders raw gateway exceptions as assistant text', () => {
+    const failed = reduceGatewayEvent(
+      runtime,
+      event('error', { message: 'Session has at least 20001 active messages; max_resume_messages is 20000' }),
+      6_000
+    )
+
+    expect(failed.messages[0].text).toBe('This chat is too large to continue live. Start a new chat to keep going.')
+    expect(failed.messages[0].text).not.toMatch(/2000|active messages|max_resume_messages/i)
+  })
 })
