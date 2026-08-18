@@ -91,7 +91,7 @@ App Store Connect names are globally unique, and “Mikey” was already taken. 
 - Display name: **Mikey**
 - App Store Connect record: **Mikey Agent**
 - Bundle ID: `com.ignacioiacovino.mikey`
-- Version/build: `1.0 (4)`
+- Version/build: `1.0 (5)`
 - Apple team: `JXF76W23J6`
 - App Store Connect app ID: `6802144898`
 
@@ -194,6 +194,14 @@ Build 3 used a circular scroll heuristic: it would scroll after rendering only w
 - a `ResizeObserver` catches late wrapping and expanding activity cards that change transcript height without adding a message.
 
 The complaint-driven browser fixture exercised a real 69,728-pixel transcript. It opened at exactly zero pixels from the bottom, exposed the control after moving 700 pixels upward, and returned to zero after the button was tapped. Four pure scroll-boundary regressions bring the dedicated mobile suite to 18 tests.
+
+## Build 5: user conversations, not agent machinery
+
+Build 4 exposed a cron run as a normal chat. Its first `user` row was actually the scheduler's synthetic `[IMPORTANT: You are running as a scheduled cron job…]` instruction, so filtering only by message role was insufficient. Those rows carry no per-message display metadata in the current database; the reliable boundary is the session source.
+
+Mikey now excludes operational `cron`, `subagent`, and retrieval-verification sessions from the conversation drawer while retaining interactive Telegram, CLI, Desktop, Mikey, and other messaging sessions. Because recent history can be dominated by automation, the client uses bounded 60-row pagination until it has 60 real conversations instead of issuing one oversized request or leaving the drawer empty.
+
+The upgrade regression seeds Build 4's last-selected ID with a real gratitude cron session, reloads the app, and proves that the synthetic prompt is absent, the cron title is absent, the stale selection is not resumed, the new-chat state remains usable, and 60 interactive chats are still listed.
 
 ## Pitfalls for the next build
 
