@@ -29,6 +29,7 @@ import {
   type BotProfile
 } from './bots/api'
 import { dateLabel, formatTime, sameCalendarDay, transcriptMessages } from './chat/format'
+import { MarkdownMessage } from './chat/MarkdownMessage'
 import { friendlyError } from './chat/errors'
 import { reduceGatewayEvent } from './chat/event-reducer'
 import { newSessionParams } from './chat/session-create'
@@ -554,7 +555,10 @@ export function App() {
                 <div className="message-entry" key={message.id}>
                   {showDay && <div className="date-separator"><span>{dateLabel(message.timestamp)}</span></div>}
                   <article className={`message ${message.role} ${message.error ? 'is-error' : ''}`}>
-                    <div className="message-text">{message.text}{message.streaming && <span className="streaming-cursor" />}</div>
+                    <div className="message-text">
+                      <MarkdownMessage text={message.text} />
+                      {message.streaming && <span className="streaming-cursor" />}
+                    </div>
                     <time dateTime={new Date(message.timestamp).toISOString()}>{message.streaming ? 'Now' : formatTime(message.timestamp)}</time>
                   </article>
                 </div>

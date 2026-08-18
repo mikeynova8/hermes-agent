@@ -91,7 +91,7 @@ App Store Connect names are globally unique, and “Mikey” was already taken. 
 - Display name: **Mikey**
 - App Store Connect record: **Mikey Agent**
 - Bundle ID: `com.ignacioiacovino.mikey`
-- Version/build: `1.0 (7)`
+- Version/build: `1.0 (8)`
 - Apple team: `JXF76W23J6`
 - App Store Connect app ID: `6802144898`
 
@@ -225,6 +225,12 @@ The roster intentionally does **not** show latest-message previews. Hermes profi
 Updating Hermes also tightened WebSocket Origin checks. The tailnet-only Caddy proxy now rewrites the upstream Origin to the trusted loopback dashboard origin while leaving the client connection private and authenticated. A production-bundle E2E opened the real Home profile, loaded its canonical history, sent `Reply with exactly: BOT MODE OK`, observed streaming, received `BOT MODE OK`, and remained connected. The mobile suite contains 31 passing tests.
 
 Build 7 also reconnects after an already-open WebSocket closes, covering transient proxy restarts and iOS foreground/sleep transitions rather than only initial connection failures.
+
+## Build 8: Markdown is presentation, not transcript text
+
+Build 7 rendered assistant content inside a plain text `<div>`, so Markdown control characters appeared literally: `###` headings, `**bold**`, list hyphens, and backticks. Build 8 routes message text through `react-markdown` with GitHub-flavored Markdown support and raw HTML disabled. Mobile styles provide restrained heading hierarchy, list rhythm, safe links, inline-code pills, horizontally scrollable fenced code and tables, blockquotes, task lists, and long-token wrapping.
+
+Component regressions render the exact release-proof shape from the physical-device complaint and assert semantic heading/list/bold/code output. They also cover fenced code, raw-script suppression, safe external-link attributes, and disabled task checkboxes. The suite now includes `.tsx` component tests instead of silently excluding them.
 
 ## Pitfalls for the next build
 

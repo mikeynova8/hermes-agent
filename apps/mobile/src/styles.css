@@ -247,7 +247,129 @@ svg {
   font-size: 17px;
   font-weight: 400;
   line-height: 24px;
+}
+
+.markdown-message {
+  min-width: 0;
+}
+
+.markdown-message > :first-child {
+  margin-top: 0;
+}
+
+.markdown-message > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-message p {
+  margin: 0 0 12px;
   white-space: pre-wrap;
+}
+
+.markdown-message h1,
+.markdown-message h2,
+.markdown-message h3,
+.markdown-message h4 {
+  margin: 22px 0 10px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+
+.markdown-message h1 { font-size: 24px; }
+.markdown-message h2 { font-size: 21px; }
+.markdown-message h3 { font-size: 19px; }
+.markdown-message h4 { font-size: 17px; }
+
+.markdown-message ul,
+.markdown-message ol {
+  margin: 8px 0 14px;
+  padding-left: 24px;
+}
+
+.markdown-message li {
+  margin: 4px 0;
+  padding-left: 2px;
+}
+
+.markdown-message li > p {
+  margin: 0;
+}
+
+.markdown-message strong {
+  font-weight: 700;
+}
+
+.markdown-message a {
+  color: #8eb9ff;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.markdown-message code {
+  padding: 2px 5px;
+  border: 1px solid var(--strong-border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.88em;
+  overflow-wrap: anywhere;
+}
+
+.markdown-message pre {
+  max-width: 100%;
+  margin: 12px 0 16px;
+  overflow-x: auto;
+  border: 1px solid var(--strong-border);
+  border-radius: 12px;
+  background: #111318;
+  -webkit-overflow-scrolling: touch;
+}
+
+.markdown-message pre code {
+  display: block;
+  min-width: max-content;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.markdown-message blockquote {
+  margin: 12px 0;
+  padding-left: 13px;
+  border-left: 3px solid var(--strong-border);
+  color: var(--secondary);
+}
+
+.markdown-message hr {
+  margin: 20px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.markdown-message table {
+  display: block;
+  max-width: 100%;
+  margin: 12px 0;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+.markdown-message th,
+.markdown-message td {
+  padding: 7px 9px;
+  border: 1px solid var(--strong-border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.markdown-message input[type='checkbox'] {
+  margin: 0 7px 0 0;
+  accent-color: var(--accent);
 }
 
 .message time {
