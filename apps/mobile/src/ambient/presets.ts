@@ -29,8 +29,8 @@ export function ambientPresets(clock: () => number = now): AmbientPreset[] {
       payload: {
         contextID: 'demo-leave-by',
         category: 'Leave by',
-        title: 'Head out in 24 minutes',
-        detail: '17 min by bike · rain starts around 19:00',
+        title: 'Bike to Poblenou',
+        detail: '17 min by bike · Rain around 19:00',
         symbolName: 'bicycle',
         tintHex: '67D4FF',
         targetDate: current + 24 * 60 * 1_000,
@@ -44,7 +44,7 @@ export function ambientPresets(clock: () => number = now): AmbientPreset[] {
       payload: {
         contextID: 'demo-agent-progress',
         category: 'Working',
-        title: 'Preparing TestFlight build',
+        title: 'TestFlight build',
         detail: 'Running release checks · 3 of 5 complete',
         symbolName: 'hammer.fill',
         tintHex: 'A78BFA',
@@ -59,7 +59,7 @@ export function ambientPresets(clock: () => number = now): AmbientPreset[] {
       payload: {
         contextID: 'demo-open-evening',
         category: 'Free time',
-        title: '2 hours 10 minutes open',
+        title: 'Evening is open',
         detail: 'Next: dinner with Olga at 20:30',
         symbolName: 'moon.stars.fill',
         tintHex: 'F6C453',
