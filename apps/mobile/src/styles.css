@@ -990,7 +990,8 @@ svg {
   background: rgb(0 0 0 / 58%);
 }
 
-.project-sheet {
+.project-sheet,
+.ambient-sheet {
   position: absolute;
   right: 0;
   bottom: 0;
@@ -1015,7 +1016,8 @@ svg {
   background: rgb(255 255 255 / 18%);
 }
 
-.project-sheet h2 {
+.project-sheet h2,
+.ambient-sheet h2 {
   margin: 0 0 18px;
   font-size: 22px;
   line-height: 27px;
@@ -1070,6 +1072,165 @@ svg {
 .create-project-button:disabled {
   background: rgb(255 255 255 / 9%);
   color: var(--tertiary);
+}
+
+.ambient-entry {
+  display: grid;
+  width: calc(100% - 16px);
+  min-height: 62px;
+  margin: 2px 8px 8px;
+  padding: 8px;
+  grid-template-columns: 38px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid rgb(124 183 255 / 17%);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgb(124 183 255 / 9%), rgb(167 139 250 / 5%));
+  text-align: left;
+}
+
+.ambient-entry:active {
+  background: rgb(124 183 255 / 14%);
+}
+
+.ambient-entry > span:nth-child(2),
+.ambient-preset > span:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.ambient-entry strong,
+.ambient-preset strong {
+  font-size: 15px;
+  font-weight: 620;
+  line-height: 19px;
+}
+
+.ambient-entry small,
+.ambient-preset small {
+  color: var(--tertiary);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.ambient-entry-icon,
+.ambient-preset-symbol {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 11px;
+  background: rgb(124 183 255 / 13%);
+  color: var(--accent);
+}
+
+.ambient-entry > svg {
+  width: 17px;
+  color: var(--tertiary);
+  transform: rotate(-90deg);
+}
+
+.ambient-sheet {
+  padding-bottom: max(22px, env(safe-area-inset-bottom));
+}
+
+.ambient-sheet-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ambient-sheet-header h2 {
+  margin-top: 2px;
+  margin-bottom: 0;
+}
+
+.ambient-kicker {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 720;
+  letter-spacing: 0.12em;
+}
+
+.ambient-intro {
+  margin: 10px 0 16px;
+  color: var(--secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.ambient-notice,
+.ambient-status {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--strong-border);
+  border-radius: 12px;
+  background: var(--overlay);
+  color: var(--secondary);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.ambient-preset-list {
+  display: grid;
+  gap: 9px;
+}
+
+.ambient-preset {
+  display: grid;
+  width: 100%;
+  min-height: 68px;
+  padding: 9px 10px;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--overlay);
+  text-align: left;
+}
+
+.ambient-preset.is-running {
+  border-color: rgb(124 183 255 / 45%);
+  background: rgb(124 183 255 / 10%);
+}
+
+.ambient-preset:disabled {
+  opacity: 0.48;
+}
+
+.ambient-preset-action {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 8%);
+  color: var(--secondary);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.ambient-preset.is-running .ambient-preset-action {
+  background: rgb(124 183 255 / 18%);
+  color: #b9d9ff;
+}
+
+.ambient-status {
+  margin-top: 12px;
+  border-color: rgb(124 183 255 / 22%);
+  color: #c6ddfa;
+}
+
+.ambient-stop {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 2px;
+  border: 1px solid var(--strong-border);
+  border-radius: 13px;
+  background: transparent;
+  color: #ffb1b1;
+  font-size: 15px;
+  font-weight: 620;
 }
 
 .visually-hidden {
