@@ -10,7 +10,9 @@ import {
   Menu as MenuIcon,
   MessageSquare as ChatsIcon,
   Plus as PlusIcon,
-  SquarePen as ComposeIcon
+  Sparkles as AmbientIcon,
+  SquarePen as ComposeIcon,
+  X as CloseIcon
 } from 'lucide-react'
 
 import {
@@ -42,6 +44,8 @@ import {
   type ProjectSession,
   type ProjectTreeNode
 } from './projects/api'
+import { activityAvailability, endActivity, startActivity } from './ambient/activity'
+import { ambientPresets, type AmbientPreset } from './ambient/presets'
 import { hermesWsUrl } from './transport/auth'
 import { listSessions, loadSessionMessages, type SessionInfo, type TranscriptMessage } from './transport/session-api'
 
@@ -102,6 +106,12 @@ export function App() {
   const [projectName, setProjectName] = useState('')
   const [projectPath, setProjectPath] = useState('')
   const [projectSaving, setProjectSaving] = useState(false)
+  const [ambientSheetOpen, setAmbientSheetOpen] = useState(false)
+  const [ambientAvailable, setAmbientAvailable] = useState<boolean | null>(null)
+  const [ambientEnabled, setAmbientEnabled] = useState<boolean | null>(null)
+  const [ambientBusy, setAmbientBusy] = useState(false)
+  const [ambientStatus, setAmbientStatus] = useState<string | null>(null)
+  const [runningActivity, setRunningActivity] = useState<{ id: string; preset: AmbientPreset } | null>(null)
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -519,6 +529,53 @@ export function App() {
   const headerTitle = activeBot ? botDisplayName(activeBot) : selectedSession ? sessionTitle(selectedSession) : projectScope?.label || 'Mikey'
   const visibleProjects = projectTree.filter(project => !project.isNoProject)
   const activity = activitySummary(thread)
+  const lockScreenPresets = useMemo(() => ambientPresets(), [])
+
+  const openAmbientLab = async () => {
+    setDrawerOpen(false)
+    setAmbientSheetOpen(true)
+    setAmbientStatus(null)
+    try {
+      const availability = await activityAvailability()
+      setAmbientAvailable(availability.available)
+      setAmbientEnabled(availability.enabled)
+    } catch {
+      setAmbientAvailable(false)
+      setAmbientEnabled(false)
+    }
+  }
+
+  const launchAmbientPreset = async (preset: AmbientPreset) => {
+    if (ambientBusy) return
+    setAmbientBusy(true)
+    setAmbientStatus(null)
+    try {
+      if (runningActivity) {
+        await endActivity(runningActivity.preset.payload, runningActivity.id).catch(() => undefined)
+      }
+      const result = await startActivity(preset.payload)
+      setRunningActivity({ id: result.activityID, preset })
+      setAmbientStatus('Live on your Lock Screen and Dynamic Island.')
+    } catch (cause) {
+      setAmbientStatus(friendlyError(cause, 'Could not start the Live Activity'))
+    } finally {
+      setAmbientBusy(false)
+    }
+  }
+
+  const stopAmbientActivity = async () => {
+    if (!runningActivity || ambientBusy) return
+    setAmbientBusy(true)
+    try {
+      await endActivity(runningActivity.preset.payload, runningActivity.id)
+      setRunningActivity(null)
+      setAmbientStatus('Live Activity ended.')
+    } catch (cause) {
+      setAmbientStatus(friendlyError(cause, 'Could not end the Live Activity'))
+    } finally {
+      setAmbientBusy(false)
+    }
+  }
 
   return (
     <div className="app-shell">
@@ -707,6 +764,17 @@ export function App() {
                 </section>
               )}
 
+              {!projectScope && !query.trim() && (
+                <button className="ambient-entry" onClick={() => void openAmbientLab()}>
+                  <span className="ambient-entry-icon"><AmbientIcon /></span>
+                  <span>
+                    <strong>Lock Screen Lab</strong>
+                    <small>Live Activities from Mikey</small>
+                  </span>
+                  <ChevronIcon />
+                </button>
+              )}
+
               <div className="drawer-section-heading chats-heading">
                 <span>{projectScope ? 'Chats' : query.trim() ? 'Results' : 'Recent'}</span>
               </div>
@@ -771,6 +839,52 @@ export function App() {
           <button className="create-project-button" disabled={!projectName.trim() || !projectPath.trim() || projectSaving} onClick={() => void saveProject()}>
             {projectSaving ? 'Creating…' : 'Create project'}
           </button>
+        </section>
+      </div>
+
+      <div className={`sheet-layer ${ambientSheetOpen ? 'is-open' : ''}`} aria-hidden={!ambientSheetOpen}>
+        <button className="sheet-scrim" aria-label="Close Lock Screen Lab" onClick={() => setAmbientSheetOpen(false)} />
+        <section className="ambient-sheet" aria-label="Lock Screen Lab">
+          <div className="sheet-handle" />
+          <div className="ambient-sheet-header">
+            <div>
+              <span className="ambient-kicker">AMBIENT MIKEY</span>
+              <h2>Lock Screen Lab</h2>
+            </div>
+            <button className="icon-button" aria-label="Close Lock Screen Lab" onClick={() => setAmbientSheetOpen(false)}>
+              <CloseIcon />
+            </button>
+          </div>
+          <p className="ambient-intro">Try one safe native template. Mikey chooses the content; iOS owns the surface.</p>
+          {ambientAvailable === false && (
+            <p className="ambient-notice">Live Activities need the native Mikey iPhone app on iOS 16.2 or later.</p>
+          )}
+          {ambientAvailable === true && ambientEnabled === false && (
+            <p className="ambient-notice">Live Activities are currently disabled on this device.</p>
+          )}
+          <div className="ambient-preset-list">
+            {lockScreenPresets.map(preset => (
+              <button
+                className={`ambient-preset ${runningActivity?.preset.id === preset.id ? 'is-running' : ''}`}
+                disabled={ambientBusy || ambientEnabled === false}
+                key={preset.id}
+                onClick={() => void launchAmbientPreset(preset)}
+              >
+                <span className="ambient-preset-symbol"><AmbientIcon /></span>
+                <span>
+                  <strong>{preset.label}</strong>
+                  <small>{preset.description}</small>
+                </span>
+                <span className="ambient-preset-action">{runningActivity?.preset.id === preset.id ? 'Live' : 'Try'}</span>
+              </button>
+            ))}
+          </div>
+          {ambientStatus && <p className="ambient-status" role="status">{ambientStatus}</p>}
+          {runningActivity && (
+            <button className="ambient-stop" disabled={ambientBusy} onClick={() => void stopAmbientActivity()}>
+              End Live Activity
+            </button>
+          )}
         </section>
       </div>
     </div>
