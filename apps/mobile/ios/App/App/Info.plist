@@ -22,6 +22,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSContactsUsageDescription</key>
+	<string>Hermes uses your contacts to help with automations you request, such as finding people and preparing contact-aware actions.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Hermes uses your location while the app is open to help with location-aware automations you request.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>UILaunchStoryboardName</key>

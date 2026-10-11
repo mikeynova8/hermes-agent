@@ -1,13 +1,22 @@
 import UIKit
 import Capacitor
+import Contacts
+import CoreLocation
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
+    private let locationManager = CLLocationManager()
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Request the two user-controlled data sources that the Hermes mobile
+        // client is intended to use for automations. iOS shows each prompt at
+        // most once; denied access remains denied until the user changes it in
+        // Settings. We deliberately request while-in-use location only here:
+        // background/always tracking would be a separate, higher-impact feature.
+        CNContactStore().requestAccess(for: .contacts) { _, _ in }
+        locationManager.requestWhenInUseAuthorization()
         return true
     }
 
