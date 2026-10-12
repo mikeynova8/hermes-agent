@@ -91,7 +91,7 @@ App Store Connect names are globally unique, and “Mikey” was already taken. 
 - Display name: **Mikey**
 - App Store Connect record: **Mikey Agent**
 - Bundle ID: `com.ignacioiacovino.mikey`
-- Version/build: `1.0 (8)`
+- Version/build: `1.0 (9)` candidate
 - Apple team: `JXF76W23J6`
 - App Store Connect app ID: `6802144898`
 
@@ -231,6 +231,24 @@ Build 7 also reconnects after an already-open WebSocket closes, covering transie
 Build 7 rendered assistant content inside a plain text `<div>`, so Markdown control characters appeared literally: `###` headings, `**bold**`, list hyphens, and backticks. Build 8 routes message text through `react-markdown` with GitHub-flavored Markdown support and raw HTML disabled. Mobile styles provide restrained heading hierarchy, list rhythm, safe links, inline-code pills, horizontally scrollable fenced code and tables, blockquotes, task lists, and long-token wrapping.
 
 Component regressions render the exact release-proof shape from the physical-device complaint and assert semantic heading/list/bold/code output. They also cover fenced code, raw-script suppression, safe external-link attributes, and disabled task checkboxes. The suite now includes `.tsx` component tests instead of silently excluding them.
+
+## Build 9: Mikey becomes ambient
+
+The Lock Screen idea belongs inside Mikey rather than in a second app. Mikey already owns the Hermes connection, shared sessions, App Store identity, and mobile permission boundary. Throwing that away would duplicate the difficult transport work without making Live Activities more native.
+
+The implementation is intentionally hybrid:
+
+- the existing React renderer remains the chat and configuration surface;
+- a small Swift `CAPBridgedPlugin` owns ActivityKit lifecycle calls;
+- a native WidgetKit extension renders the Lock Screen, banner, and Dynamic Island;
+- a shared `ActivityAttributes` contract keeps the host app and extension in sync;
+- the model chooses from bounded payload fields—category, title, detail, symbol, tint, progress, and deadline—rather than generating arbitrary SwiftUI.
+
+The first vertical slice is **Lock Screen Lab** in the conversation drawer. It offers leave-by, agent-progress, and open-evening templates, starts one native Live Activity at a time, and can end it explicitly. No credential, door code, private transcript, or sensitive command is allowed into these presets. Activity receipt is presentation, not authorization.
+
+Why not rewrite Mikey in SwiftUI? The system surface is already 100% SwiftUI/WidgetKit where Apple requires it. Rewriting the chat shell would add months of duplicate Markdown, streaming, session, project, Bot, attachment, and reconnect work while producing the same ActivityKit extension. Native where the OS boundary demands it; reuse where the product already works.
+
+Simulator compilation, installation, extension embedding, native plugin discovery, and Lock Screen Lab UI all pass. The iOS 26.2 simulator reports Live Activities disabled, so actual Lock Screen/Dynamic Island rendering remains a physical-device acceptance gate before Build 9 can be released.
 
 ## Pitfalls for the next build
 
