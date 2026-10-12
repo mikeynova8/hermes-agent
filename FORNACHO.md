@@ -262,6 +262,21 @@ The remaining acceptance gate is physical installation and launch on a real iPho
 2. Rebuild the renderer and run `npx cap sync ios` before archiving.
 3. Never place the real Hermes credential in source, generated web assets, logs, or an export plist.
 4. Verify the processed archive and exported IPA, not only Xcode source settings.
+
+## Build 9 candidate: permission-aware phone data
+
+The permission prompt is not the feature. Build 9 adds an app-local Capacitor bridge, registered explicitly by `MikeyBridgeViewController`, with three narrow operations:
+
+- `authorizationStatus` reports current Contacts and Location authorization;
+- `searchContacts` performs a foreground, name-only Contacts query capped at ten results and three phone numbers/emails per result;
+- `readLocation` requests one while-in-use fix with hundred-metre accuracy and an eight-second timeout.
+
+Every read checks current OS authorization again. Denied, restricted, revoked, offline, and timed-out cases reject honestly. There is no background tracking, bulk contact export, contact editing, or cached location fallback. Limited Contacts access remains visible in the result metadata.
+
+The TypeScript service only publishes an explicit bounded result to the currently selected session through the existing authenticated Hermes REST chat path. It includes a device-scoped continuity key, requires a non-empty session ID, caps the serialized payload, and never contains a backend secret. It cannot select another chat implicitly or upload a contacts database.
+
+The native bridge must be exercised through a built Capacitor app; TypeScript policy tests alone do not prove registration. Build the CocoaPods workspace (`apps/mobile/ios/App/App.xcworkspace`), then run on a physical iPhone to verify real permission, limited-access, revocation, offline, and timeout behavior. Simulator and source-level tests are not physical-device proof.
+
 5. Upload success is not installability. Wait for `VALID`, confirm export compliance, group attachment, and tester access.
 6. The iPhone must be connected to Nacho's tailnet; otherwise the intentionally private backend will be unreachable.
 7. Background WebSockets are constrained by iOS. Treat Mikey as a foreground workspace until APNs/background coordination is designed explicitly.

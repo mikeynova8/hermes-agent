@@ -3734,6 +3734,11 @@ class APIServerAdapter(BasePlatformAdapter):
         body, err = await self._read_json_body(request)
         if err:
             return err
+        if body.get("source") == "mikey-ios-phone-data":
+            device_id = request.headers.get("X-Hermes-Device-Id", "").strip()
+            session_header = request.headers.get("X-Hermes-Session-Id", "").strip()
+            if not re.fullmatch(r"[0-9a-fA-F-]{36}", device_id) or session_header != session_id or gateway_session_key != f"mikey-ios:{device_id}":
+                return web.json_response(_openai_error("Phone data request is not bound to this device and session", code="phone_binding_rejected"), status=403)
         user_message, err = _session_chat_user_message(body)
         if err is not None:
             return err
