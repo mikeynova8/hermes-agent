@@ -277,6 +277,12 @@ The TypeScript service only publishes an explicit bounded result to the currentl
 
 The native bridge must be exercised through a built Capacitor app; TypeScript policy tests alone do not prove registration. Build the CocoaPods workspace (`apps/mobile/ios/App/App.xcworkspace`), then run on a physical iPhone to verify real permission, limited-access, revocation, offline, and timeout behavior. Simulator and source-level tests are not physical-device proof.
 
+## Build 10 candidate: bridge integration
+
+Build 10 carries the phone-data bridge onto the shipped build-9 base rather than replacing its later native work. The bridge controller registers both `MikeyActivityPlugin` and `MikeyPhoneDataPlugin`, so Live Activities remain enabled while Contacts and foreground-only location stay available. The API binding remains explicit: phone results name the selected session, carry a device-scoped UUID, and are capped before the authenticated chat transport is used.
+
+The release gate is the exact workspace archive after `npx cap sync ios` and CocoaPods installation. TypeScript/API tests prove policy and request binding; they do not prove native Contacts/location callbacks. A physical iPhone invocation of Contacts and location remains pending for this build.
+
 5. Upload success is not installability. Wait for `VALID`, confirm export compliance, group attachment, and tester access.
 6. The iPhone must be connected to Nacho's tailnet; otherwise the intentionally private backend will be unreachable.
 7. Background WebSockets are constrained by iOS. Treat Mikey as a foreground workspace until APNs/background coordination is designed explicitly.

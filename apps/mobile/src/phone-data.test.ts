@@ -20,12 +20,12 @@ describe('phone data transport policy', () => {
 
     await publishPhoneData('session-owner-a', 'location', { latitude: 41.4, longitude: 2.1 })
     expect(fetchMock).toHaveBeenCalledOnce()
-    const [url, init] = fetchMock.mock.calls[0]
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toContain('/api/sessions/session-owner-a/chat')
-    expect((init as RequestInit).headers).toMatchObject({
+    expect(init.headers).toMatchObject({
       'X-Hermes-Session-Id': 'session-owner-a'
     })
-    expect((init as RequestInit).body).toContain('location')
+    expect(init.body).toContain('location')
   })
 
   it('rejects oversized results before they reach the network', async () => {

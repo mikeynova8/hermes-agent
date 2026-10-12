@@ -125,6 +125,7 @@ public final class MikeyPhoneDataPlugin: CAPPlugin, CAPBridgedPlugin {
 private final class OneShotLocationReader: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     private var completion: ((Result<[String: Any], Error>) -> Void)?
+    private var authorizationCompletion: ((Bool) -> Void)?
     private var timer: Timer?
 
     override init() {
@@ -135,8 +136,17 @@ private final class OneShotLocationReader: NSObject, CLLocationManagerDelegate {
     }
 
     func requestWhenInUse(completion: @escaping (Bool) -> Void) {
-        manager.requestWhenInUseAuthorization()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { completion(CLLocationManager.authorizationStatus() == .authorizedWhenInUse) }
+        switch CLLocationManager.authorizationStatus() {
+        case .authorizedWhenInUse:
+            completion(true)
+        case .denied, .restricted, .authorizedAlways:
+            completion(false)
+        case .notDetermined:
+            authorizationCompletion = completion
+            manager.requestWhenInUseAuthorization()
+        @unknown default:
+            completion(false)
+        }
     }
 
     func read(timeout: TimeInterval, completion: @escaping (Result<[String: Any], Error>) -> Void) {
@@ -146,6 +156,14 @@ private final class OneShotLocationReader: NSObject, CLLocationManagerDelegate {
             self?.finish(.failure(NSError(domain: "MikeyPhoneData", code: 408, userInfo: [NSLocalizedDescriptionKey: "Location request timed out"])))
         }
         manager.requestLocation()
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        guard let callback = authorizationCompletion else { return }
+        let status = manager.authorizationStatus
+        guard status != .notDetermined else { return }
+        authorizationCompletion = nil
+        callback(status == .authorizedWhenInUse)
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
