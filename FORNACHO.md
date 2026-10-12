@@ -250,6 +250,12 @@ Why not rewrite Mikey in SwiftUI? The system surface is already 100% SwiftUI/Wid
 
 Simulator compilation, installation, extension embedding, native plugin discovery, and Lock Screen Lab UI all pass. The iOS 26.2 simulator reports Live Activities disabled, so actual Lock Screen/Dynamic Island rendering remains a physical-device acceptance gate before Build 9 can be released.
 
+## Release proof — TestFlight build 9
+
+The uploaded binary was archived from commit `bd62afef4e8f637ed8c2847099508c2057155a67` after preserving the Live Activities work from `mikey-live-activities` and updating the critical Capacitor dependency. App Store Connect accepted build `1.0 (9)` as `VALID`; the exact build is attached to the **Internal Testers** group and has tester access. The secret-free readback is recorded at `/Volumes/DevSSD/Releases/Mikey/permissions-release/final-asc-proof.json`, with archive/export logs beside it.
+
+The remaining acceptance gate is physical installation and launch on a real iPhone. Simulator Release build/install/launch passed, but simulator evidence is not physical-device proof.
+
 ## Pitfalls for the next build
 
 1. Increment `CURRENT_PROJECT_VERSION`; Apple rejects duplicate build numbers.
