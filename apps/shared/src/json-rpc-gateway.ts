@@ -83,6 +83,8 @@ export interface GatewayClientOptions {
   requestTimeoutMs?: number
   socketFactory?: (url: string) => WebSocketLike
   notConnectedErrorMessage?: string
+  /** Handle authenticated server-initiated JSON-RPC requests. */
+  requestHandler?: (method: string, params: Record<string, unknown>) => unknown | Promise<unknown>
 }
 
 const ANY = '*'
@@ -112,6 +114,7 @@ export class JsonRpcGatewayClient {
       onSocketClose: options.onSocketClose ?? (() => false),
       requestIdPrefix: options.requestIdPrefix ?? 'r',
       requestTimeoutMs: options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
+      requestHandler: options.requestHandler ?? (() => undefined),
       socketFactory: options.socketFactory
     }
   }
@@ -393,7 +396,7 @@ export class JsonRpcGatewayClient {
       return
     }
 
-    if (frame.id !== undefined && frame.id !== null) {
+    if (frame.id !== undefined && frame.id !== null && !frame.method) {
       const call = this.pending.get(frame.id)
 
       if (!call) {
@@ -416,8 +419,27 @@ export class JsonRpcGatewayClient {
       return
     }
 
+    if (frame.method && frame.id !== undefined && frame.id !== null) {
+      void this.handleServerRequest(frame)
+      return
+    }
+
     if (frame.method === 'event' && frame.params?.type) {
       this.dispatchEvent(frame.params)
+    }
+  }
+
+  private async handleServerRequest(frame: JsonRpcFrame): Promise<void> {
+    try {
+      const params = frame.params as unknown as Record<string, unknown> | undefined
+      const result = await this.options.requestHandler(frame.method!, params ?? {})
+      this.socket?.send(JSON.stringify({ jsonrpc: '2.0', id: frame.id, result }))
+    } catch (error) {
+      this.socket?.send(JSON.stringify({
+        jsonrpc: '2.0',
+        id: frame.id,
+        error: { code: -32001, message: error instanceof Error ? error.message : String(error) }
+      }))
     }
   }
 

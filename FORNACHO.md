@@ -86,6 +86,10 @@ Anything shipped inside an IPA should be considered extractable. The proxy-marke
 
 App Store Connect names are globally unique, and “Mikey” was already taken. Apple accepted “Mikey Agent” for the store record. `CFBundleDisplayName` remains “Mikey,” so the installed icon still says Mikey.
 
+## Hermes ↔ Mikey bounded phone requests
+
+The phone-data path now rides the existing authenticated `/api/ws` JSON-RPC socket. Mikey binds one selected session plus its stable device UUID, and Hermes sends one request with a request ID; the phone executes the existing Capacitor Contacts or Core Location bridge and returns one typed result. Contacts remain query-and-limit bounded, and location remains one-shot. Offline, timeout, denial, unavailable, and limited outcomes stay explicit. Always permission only enables the already-explicit background capability; it never turns this request path into continuous tracking or history upload.
+
 ## Release identity
 
 - Display name: **Mikey**

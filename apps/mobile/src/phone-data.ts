@@ -39,6 +39,37 @@ export async function searchPhoneContacts(query: string, limit = 10): Promise<{ 
 }
 export async function readPhoneLocation(): Promise<LocationResult> { return NativePhoneData.readLocation() }
 
+export function phoneDataDeviceId(): string { return deviceId() }
+
+/** Execute exactly one gateway-issued, selected-session request. */
+export async function handlePhoneDataRequest(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const sessionId = typeof params.session_id === 'string' ? params.session_id.trim() : ''
+  const boundDevice = typeof params.device_id === 'string' ? params.device_id : ''
+  const kind = params.kind
+  if (!sessionId || boundDevice !== deviceId()) throw new Error('phone_binding_rejected')
+  if (kind === 'contacts') {
+    const query = typeof params.query === 'string' ? params.query : ''
+    const limit = typeof params.limit === 'number' ? params.limit : 10
+    try {
+      const result = await searchPhoneContacts(query, limit)
+      return { request_id: params.request_id, session_id: sessionId, device_id: deviceId(), kind, status: result.limited ? 'limited' : 'ok', result }
+    } catch (error) {
+      return { request_id: params.request_id, session_id: sessionId, device_id: deviceId(), kind, status: error instanceof Error && /permission/i.test(error.message) ? 'denied' : 'unavailable', error: { code: error instanceof Error ? error.message : 'contacts_unavailable' } }
+    }
+  }
+  if (kind === 'location') {
+    try {
+      const result = await readPhoneLocation()
+      return { request_id: params.request_id, session_id: sessionId, device_id: deviceId(), kind, status: 'ok', result }
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'location_unavailable'
+      const status = /denied/i.test(code) ? 'denied' : /restricted/i.test(code) ? 'restricted' : /timeout/i.test(code) ? 'timeout' : 'unavailable'
+      return { request_id: params.request_id, session_id: sessionId, device_id: deviceId(), kind, status, error: { code } }
+    }
+  }
+  throw new Error('invalid_phone_request')
+}
+
 /**
  * Sends only an explicit, bounded result to the selected authenticated session.
  * The phone never uploads a contacts database, uses a background channel, or

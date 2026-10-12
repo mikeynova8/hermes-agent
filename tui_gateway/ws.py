@@ -381,6 +381,12 @@ async def handle_ws(ws: Any) -> None:
                     break
                 continue
 
+            # Server-initiated phone requests use the same JSON-RPC socket. Their
+            # responses must resolve the bounded request rather than be dispatched
+            # as a new client call.
+            if isinstance(req, dict) and req.get("id") is not None and server.handle_phone_response(req, transport):
+                continue
+
             # dispatch() may schedule long handlers on the pool; it returns
             # None in that case and the worker writes the response itself via
             # the transport we pass in (a separate thread, so transport.write
@@ -431,6 +437,7 @@ async def handle_ws(ws: Any) -> None:
         detached_sessions = 0
         if transport is not None:
             server.unregister_live_transport(transport)
+            server.unregister_phone_transport(transport)
             transport.close()
 
             try:

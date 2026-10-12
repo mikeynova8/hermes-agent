@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import queue
+import re
 import subprocess
 import sys
 import threading
@@ -221,6 +222,7 @@ _LONG_HANDLERS = frozenset(
         "complete.path",
         "complete.slash",
         "llm.oneshot",
+        "mikey.phone.request",
         # model.options builds the full picker payload — per-provider credential
         # pool checks, pricing fetch, Nous tier check, optional custom-provider
         # probe — measured seconds inline. While it runs on the reader thread,
@@ -1673,6 +1675,90 @@ def _emit(event: str, sid: str, payload: dict | None = None):
 _live_transports: set[Transport] = set()
 _live_transports_lock = threading.Lock()
 
+# Authenticated, selected-session phone bindings and server-initiated requests.
+_phone_bindings: dict[tuple[str, str], Transport] = {}
+_phone_bindings_lock = threading.RLock()
+_phone_pending: dict[str, tuple[threading.Event, dict, Transport]] = {}
+_phone_pending_lock = threading.Lock()
+_PHONE_REQUEST_TIMEOUT_S = 12.0
+
+
+def register_phone_binding(session_id: str, device_id: str, transport: Transport) -> dict:
+    if not session_id or not re.fullmatch(r"[0-9a-fA-F-]{36}", device_id):
+        raise ValueError("invalid_phone_binding")
+    with _phone_bindings_lock:
+        _phone_bindings[(session_id, device_id)] = transport
+    return {"session_id": session_id, "device_id": device_id, "bound": True}
+
+
+def unregister_phone_transport(transport: Transport) -> None:
+    with _phone_bindings_lock:
+        for key, value in list(_phone_bindings.items()):
+            if value is transport:
+                _phone_bindings.pop(key, None)
+
+
+def handle_phone_response(frame: dict, transport: Transport) -> bool:
+    request_id = str(frame.get("id") or "")
+    with _phone_pending_lock:
+        pending = _phone_pending.get(request_id)
+    if pending is None or pending[2] is not transport:
+        return False
+    event, box, _ = pending
+    box["frame"] = frame
+    event.set()
+    return True
+
+
+def _request_phone( rid: str, params: dict) -> dict:
+    session_id = str(params.get("session_id") or "").strip()
+    device_id = str(params.get("device_id") or "").strip()
+    kind = params.get("kind")
+    if kind not in {"contacts", "location"}:
+        return _err(rid, -32602, "kind must be contacts or location")
+    if kind == "contacts" and (not isinstance(params.get("query"), str) or not 2 <= len(params["query"].strip()) <= 64):
+        return _err(rid, -32602, "contact query must be 2–64 characters")
+    with _phone_bindings_lock:
+        transport = _phone_bindings.get((session_id, device_id))
+    if transport is None:
+        return _err(rid, 4101, "phone session offline or unavailable", {"status": "offline"})
+    request_id = f"phone-{uuid.uuid4().hex}"
+    event = threading.Event()
+    box: dict = {}
+    with _phone_pending_lock:
+        _phone_pending[request_id] = (event, box, transport)
+    try:
+        if not transport.write({"jsonrpc": "2.0", "id": request_id, "method": "mikey.phone.request", "params": {**params, "request_id": request_id}}):
+            return _err(rid, 4101, "phone session unavailable", {"status": "unavailable"})
+        if not event.wait(_PHONE_REQUEST_TIMEOUT_S):
+            return _err(rid, 4102, "phone request timed out", {"status": "timeout"})
+        frame = box.get("frame") or {}
+        if "error" in frame:
+            return _err(rid, 4103, "phone request failed", {"status": "error", "error": frame["error"]})
+        result = frame.get("result")
+        return _ok(rid, result if isinstance(result, dict) else {"status": "unavailable", "error": {"code": "invalid_phone_response"}})
+    finally:
+        with _phone_pending_lock:
+            _phone_pending.pop(request_id, None)
+
+
+def _mikey_phone_bind(rid, params: dict) -> dict:
+    transport = current_transport()
+    if transport is None:
+        return _err(rid, 4100, "phone binding requires a WebSocket")
+    try:
+        return _ok(rid, register_phone_binding(str(params.get("session_id") or "").strip(), str(params.get("device_id") or "").strip(), transport))
+    except ValueError as exc:
+        return _err(rid, 4001, str(exc))
+
+
+def _mikey_phone_request(rid, params: dict) -> dict:
+    return _request_phone(rid, params)
+
+
+# Registered after the shared decorator is defined below; keeping these handlers
+# here preserves the gateway's single JSON-RPC registry and transport lifecycle.
+
 
 def register_live_transport(transport: Transport | None) -> None:
     """Track a connected client transport for global broadcasts. Idempotent."""
@@ -2038,6 +2124,10 @@ def method(name: str):
         return fn
 
     return dec
+
+
+_methods["mikey.phone.bind"] = _mikey_phone_bind
+_methods["mikey.phone.request"] = _mikey_phone_request
 
 
 def _normalize_request(req: Any) -> tuple[Any, str, dict] | dict:

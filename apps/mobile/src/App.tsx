@@ -47,6 +47,7 @@ import {
 import { activityAvailability, endActivity, startActivity } from './ambient/activity'
 import { ambientPresets, type AmbientPreset } from './ambient/presets'
 import { hermesWsUrl } from './transport/auth'
+import { handlePhoneDataRequest, phoneDataDeviceId } from './phone-data'
 import { listSessions, loadSessionMessages, type SessionInfo, type TranscriptMessage } from './transport/session-api'
 
 interface ResumeResult {
@@ -291,7 +292,14 @@ export function App() {
   const connect = useCallback(async () => {
     if (gatewayRef.current?.connectionState === 'connecting' || gatewayRef.current?.connectionState === 'open') return
 
-    const gateway = new JsonRpcGatewayClient({ requestIdPrefix: 'mikey' })
+    const gateway = new JsonRpcGatewayClient({
+      requestIdPrefix: 'mikey',
+      requestHandler: (method, params) => {
+        if (method !== 'mikey.phone.request') throw new Error('unknown_phone_request')
+        if (params.session_id !== selectedRef.current) throw new Error('selected_session_mismatch')
+        return handlePhoneDataRequest(params)
+      }
+    })
     gatewayRef.current = gateway
     gateway.onState(state => {
       setConnection(state)
@@ -316,6 +324,12 @@ export function App() {
     try {
       await gateway.connect(hermesWsUrl())
       reconnectAttemptRef.current = 0
+      if (selectedRef.current) {
+        await gateway.request('mikey.phone.bind', {
+          session_id: selectedRef.current,
+          device_id: phoneDataDeviceId()
+        }, 10_000)
+      }
       setError(null)
     } catch (cause) {
       setError(friendlyError(cause, 'Could not connect to Mikey'))
@@ -351,6 +365,14 @@ export function App() {
       gateway?.close()
     }
   }, [connect, loadIndex, resumeSession])
+
+  useEffect(() => {
+    if (connection !== 'open' || !selectedId) return
+    void gatewayRef.current?.request('mikey.phone.bind', {
+      session_id: selectedId,
+      device_id: phoneDataDeviceId()
+    }, 10_000).catch(() => undefined)
+  }, [connection, selectedId])
 
   // Session index loading and WebSocket opening are independent. Reconcile
   // them declaratively so either completion order restores the selected chat.
