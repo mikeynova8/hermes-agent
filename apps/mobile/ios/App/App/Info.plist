@@ -26,6 +26,12 @@
 	<string>Hermes uses your contacts to help with automations you request, such as finding people and preparing contact-aware actions.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Hermes uses your location while the app is open to help with location-aware automations you request.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Hermes uses your location in the background only when you explicitly enable location-aware automations.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSSupportsLiveActivities</key>

@@ -2,11 +2,15 @@ import { registerPlugin } from '@capacitor/core'
 import { hermesFetch } from './transport/auth'
 
 export interface ContactResult { id: string; name: string; organization: string; phones: string[]; emails: string[] }
-export interface PhoneAuthorization { contacts: string; location: string }
+export type LocationAuthorizationState = 'notDetermined' | 'authorizedWhenInUse' | 'authorizedAlways' | 'denied' | 'restricted' | 'unavailable'
+export interface PhoneAuthorization { contacts: string; location: LocationAuthorizationState }
 export interface LocationResult { latitude: number; longitude: number; accuracyMeters: number; timestamp: string }
 
 interface MikeyPhoneDataPlugin {
   authorizationStatus(): Promise<PhoneAuthorization>
+  requestAlwaysAuthorization(): Promise<{ location: LocationAuthorizationState }>
+  startBackgroundLocation(): Promise<{ location: LocationAuthorizationState; mode: 'significant-change' }>
+  stopBackgroundLocation(): Promise<{ location: LocationAuthorizationState; mode: 'stopped' }>
   searchContacts(options: { query: string; limit?: number }): Promise<{ results: ContactResult[]; limited: boolean }>
   readLocation(): Promise<LocationResult>
 }
@@ -24,6 +28,10 @@ function deviceId(): string {
 }
 
 export async function phoneAuthorization(): Promise<PhoneAuthorization> { return NativePhoneData.authorizationStatus() }
+export async function requestAlwaysLocation(): Promise<{ location: LocationAuthorizationState }> { return NativePhoneData.requestAlwaysAuthorization() }
+export async function startBackgroundLocation(): Promise<{ location: LocationAuthorizationState; mode: 'significant-change' }> { return NativePhoneData.startBackgroundLocation() }
+export async function stopBackgroundLocation(): Promise<{ location: LocationAuthorizationState; mode: 'stopped' }> { return NativePhoneData.stopBackgroundLocation() }
+export function canUseBackgroundLocation(status: LocationAuthorizationState): boolean { return status === 'authorizedAlways' }
 export async function searchPhoneContacts(query: string, limit = 10): Promise<{ results: ContactResult[]; limited: boolean }> {
   const normalized = query.trim()
   if (normalized.length < 2 || normalized.length > MAX_QUERY) throw new Error('Contact search requires 2–64 characters')

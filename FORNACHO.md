@@ -91,7 +91,7 @@ App Store Connect names are globally unique, and “Mikey” was already taken. 
 - Display name: **Mikey**
 - App Store Connect record: **Mikey Agent**
 - Bundle ID: `com.ignacioiacovino.mikey`
-- Version/build: `1.0 (9)` candidate
+- Version/build: `1.0 (11)` candidate
 - Apple team: `JXF76W23J6`
 - App Store Connect app ID: `6802144898`
 
@@ -287,6 +287,10 @@ The release gate is the exact workspace archive after `npx cap sync ios` and Coc
 6. The iPhone must be connected to Nacho's tailnet; otherwise the intentionally private backend will be unreachable.
 7. Background WebSockets are constrained by iOS. Treat Mikey as a foreground workspace until APNs/background coordination is designed explicitly.
 8. Keep desktop capabilities out of the mobile composition by default. Add a bounded mobile sheet intentionally if files or diffs become useful later; never reactivate invisible narrow-pane hover strips on touch devices.
+
+## Build 11 candidate: explicit Always location
+
+Build 11 keeps Contacts and Live Activities intact while adding an explicit authorization escalation from `authorizedWhenInUse` to `authorizedAlways`. Background mode is opt-in: it uses Core Location significant-change monitoring with automatic pausing, emits only the latest event to the bridge, and does not upload background history or select a session implicitly. `denied`, `restricted`, and unavailable services return distinct native errors. Physical-device Always authorization and background delivery remain pending until Nacho grants Always on the iPhone.
 
 ## How good engineers should think about this
 

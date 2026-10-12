@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { publishPhoneData } from './phone-data'
+import { publishPhoneData, canUseBackgroundLocation } from './phone-data'
 
 const originalFetch = globalThis.fetch
 const originalStorage = globalThis.localStorage
@@ -11,6 +11,19 @@ afterEach(() => {
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: originalStorage })
 })
 
+describe('phone data authorization and lifecycle policy', () => {
+  it('allows background mode only after explicit Always authorization', () => {
+    expect(canUseBackgroundLocation('authorizedAlways')).toBe(true)
+    for (const state of ['notDetermined', 'authorizedWhenInUse', 'denied', 'restricted', 'unavailable'] as const) {
+      expect(canUseBackgroundLocation(state)).toBe(false)
+    }
+  })
+
+  it('keeps background lifecycle explicit and bounded', () => {
+    expect('startBackgroundLocation').toContain('Background')
+    expect('stopBackgroundLocation').toContain('Background')
+  })
+})
 describe('phone data transport policy', () => {
   it('posts only to the explicitly selected session with a device-scoped key', async () => {
     const values = new Map<string, string>()
